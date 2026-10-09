@@ -1,0 +1,11 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# roadbean: commit and push the inbox so the laptop can process it. Reuse your existing sync script if you prefer.
+RB_HOME="${RB_HOME:-$HOME/roadbean}"
+cd "$RB_HOME" || exit 1
+git add inbox/
+git commit -qm "memos $(date +%F\ %H:%M)" || { termux-toast "roadbean: nothing new"; exit 0; }
+if git pull -q --rebase && git push -q; then
+  termux-vibrate -d 100; termux-toast "roadbean: synced"
+else
+  termux-vibrate -d 600; termux-toast "roadbean: sync failed"
+fi

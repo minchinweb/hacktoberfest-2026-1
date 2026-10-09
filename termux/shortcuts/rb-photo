@@ -1,0 +1,5 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# roadbean: snap a receipt photo into the inbox (named by time so it links to the nearest memo).
+RB_HOME="${RB_HOME:-$HOME/roadbean}"
+mkdir -p "$RB_HOME/inbox"
+termux-camera-photo -c 0 "$RB_HOME/inbox/$(date +%Y-%m-%dT%H%M%S).jpg" && termux-vibrate -d 100

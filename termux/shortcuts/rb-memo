@@ -1,0 +1,24 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# roadbean: one tap starts recording a memo, the next tap stops it. Vibration confirms; no need to look.
+RB_HOME="${RB_HOME:-$HOME/roadbean}"
+INBOX="$RB_HOME/inbox"
+STATE="$RB_HOME/.recording"
+mkdir -p "$INBOX"
+
+if [ -f "$STATE" ]; then
+  termux-microphone-record -q >/dev/null 2>&1
+  rm -f "$STATE"
+  termux-vibrate -d 300
+  exit 0
+fi
+
+NAME="$(date +%Y-%m-%dT%H%M%S)"
+echo "$NAME" > "$STATE"
+termux-microphone-record -f "$INBOX/$NAME.m4a" -l 60 >/dev/null 2>&1
+termux-vibrate -d 100
+# Best-effort location, never blocks the recording. Set RB_LOCATION=0 to skip.
+if [ "${RB_LOCATION:-1}" = "1" ]; then
+  (timeout 8 termux-location -p network -r once > "$INBOX/$NAME.json" 2>/dev/null || rm -f "$INBOX/$NAME.json") &
+fi
+# -l 60 stops the recorder after 60 s; clear the toggle state so the next tap starts a new memo.
+( sleep 61; rm -f "$STATE" ) >/dev/null 2>&1 &

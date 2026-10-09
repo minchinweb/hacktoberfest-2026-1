@@ -1,0 +1,51 @@
+# Copy to roadbean.toml. Model names are pinned here, never hard-coded.
+currency = "CAD"
+
+[models]
+backend = "ollama"                 # "ollama" (laptop) or "llamacpp" (phone, Termux)
+extract = "gemma4:e4b"             # gemma4:e2b on the phone
+vision  = "gemma4:e4b"             # or qwen3-vl:8b
+stt     = "whistle"                # "whistle" | "whisper.cpp:base.en" | "native" (Gemma audio, if doctor says it works)
+vision_enabled = false             # read receipt photos with the vision model (laptop only)
+ollama_url   = "http://localhost:11434"
+llamacpp_url = "http://localhost:8080"
+
+[whistle]                          # `needle download whistle`, then move whistle.cact here
+weights = "~/.cache/whistle/whistle.cact"
+
+[whisper]                          # only used when stt = "whisper.cpp:<model>"
+binary    = "whisper-cli"
+model_dir = "~/.cache/whisper"     # holds ggml-base.en.bin etc.
+
+[vehicles.civic]
+default = true
+odometer_account = "Assets:Vehicle:Civic:Odometer"
+# aliases = ["the civic", "my car"]
+
+[mileage]
+business_account = "Income:Mileage:Business"
+personal_account = "Income:Mileage:Personal"
+opening_account  = "Equity:Opening-Balances"
+max_trip_km = 1500
+distance_tolerance = 0.10
+stale_after_days = 3
+default_business = true            # a trip memo that doesn't say business/personal counts as business
+
+[allowance]                        # personal vehicle driven for the corporation (shareholder-employee)
+enabled = true
+rate_first = "0.73"                # 2026 rate, first 5,000 km; verify on canada.ca
+rate_after = "0.67"
+threshold_km = 5000
+expense_account = "Expenses:Vehicle:Allowance"
+payable_account = "Liabilities:Due-To-Shareholder"
+
+[gst]
+split = true
+rate = "0.05"
+account = "Assets:GST-Receivable"
+
+[receipts]
+photo_link_window_min = 10
+default_payment = "visa"           # used when the memo doesn't name a payment method
+uncategorized_account = "Expenses:Uncategorized"
+payment_accounts = { visa = "Liabilities:Visa", cash = "Assets:Cash", debit = "Assets:BMO:Chequing" }

@@ -1,0 +1,22 @@
+# Payee / category -> account. First match wins. Categories come from here, not from the model.
+[[rule]]
+payee = "Petro-Canada"
+account = "Expenses:Vehicle:Fuel"
+gst = "g"
+
+[[rule]]
+regex = "^(Shell|Esso|Husky|Co-?op)"
+account = "Expenses:Vehicle:Fuel"
+gst = "g"
+
+[[rule]]
+hint = "fuel"
+account = "Expenses:Vehicle:Fuel"
+
+[[rule]]
+hint = "parking"
+account = "Expenses:Vehicle:Parking"
+
+[[rule]]
+hint = "meal"
+account = "Expenses:Meals"

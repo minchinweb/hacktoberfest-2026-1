@@ -1,0 +1,1 @@
+{"type": "receipt", "odometer": null, "distance_km": null, "destination": null, "purpose": null, "business": true, "vehicle": null, "payee": "Petro-Canada", "amount": "62.50", "currency": "CAD", "payment": null, "category_hint": "fuel", "gst": null, "confidence": "high", "transcript": "Receipt, Petro-Canada, sixty-two fifty, fuel, business."}

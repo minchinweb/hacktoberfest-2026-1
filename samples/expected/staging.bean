@@ -1,0 +1,68 @@
+; roadbean staging file: pending (!) entries. Review, then move into your ledger.
+
+2026-10-09 ! "Odometer opening" "civic at first logged trip"
+  vehicle: "civic"
+  odometer-end: 48210
+  ; REVIEW: first logged trip for this vehicle; remove if your ledger already has an opening odometer
+  Assets:Vehicle:Civic:Odometer  48210 KM
+  Equity:Opening-Balances        -48210 KM
+
+2026-10-09 ! "Mileage" "Sherwood Park site — meter install"
+  memo-sha: "b09b661e3283"
+  memo-sha-end: "a477d5249130"
+  vehicle: "civic"
+  odometer-start: 48210
+  odometer-end: 48252
+  destination: "Sherwood Park site"
+  purpose: "meter install"
+  transcript: "Start trip. Odometer four eight two one zero. Going to the Sherwood Park site for the meter install. / End trip, forty-eight two fifty-two."
+  Assets:Vehicle:Civic:Odometer  42 KM
+  Income:Mileage:Business        -42 KM
+2026-10-10 balance Assets:Vehicle:Civic:Odometer  48252 KM
+
+2026-10-09 ! "Mileage allowance" "42 km @ 0.73"
+  memo-sha: "b09b661e3283"
+  vehicle: "civic"
+  Expenses:Vehicle:Allowance      30.66 CAD
+  Liabilities:Due-To-Shareholder  -30.66 CAD
+
+2026-10-09 ! "Petro-Canada" "Fuel"
+  memo-sha: "3f5e927bbbc7"
+  gst: "g"
+  transcript: "Receipt, Petro-Canada, sixty-two fifty, fuel, business."
+  ; REVIEW: no receipt image
+  Expenses:Vehicle:Fuel  59.52 CAD
+  Assets:GST-Receivable  2.98 CAD
+  Liabilities:Visa       -62.50 CAD
+
+2026-10-09 ! "Parking" "client meeting downtown"
+  memo-sha: "442810e5ce4e"
+  transcript: "Parking, eight dollars, cash, client meeting downtown."
+  ; REVIEW: no receipt image
+  Expenses:Vehicle:Parking  8.00 CAD
+  Assets:Cash               -8.00 CAD
+
+2026-10-11 ! "Mileage" "Personal driving (763 km)"
+  memo-sha: "ffdaaefa2162"
+  vehicle: "civic"
+  odometer-start: 48252
+  odometer-end: 49015
+  Assets:Vehicle:Civic:Odometer  763 KM
+  Income:Mileage:Personal        -763 KM
+
+2026-10-11 ! "Mileage" "Leduc office"
+  memo-sha: "ffdaaefa2162"
+  vehicle: "civic"
+  odometer-start: 49015
+  odometer-end: 49100
+  destination: "Leduc office"
+  transcript: "Round trip to the Leduc office and back, about eighty-five k, odometer now forty-nine one hundred."
+  Assets:Vehicle:Civic:Odometer  85 KM
+  Income:Mileage:Business        -85 KM
+2026-10-12 balance Assets:Vehicle:Civic:Odometer  49100 KM
+
+2026-10-11 ! "Mileage allowance" "85 km @ 0.73"
+  memo-sha: "ffdaaefa2162"
+  vehicle: "civic"
+  Expenses:Vehicle:Allowance      62.05 CAD
+  Liabilities:Due-To-Shareholder  -62.05 CAD
