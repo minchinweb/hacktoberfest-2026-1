@@ -26,7 +26,8 @@ SCHEMA = {
         "gst": {"type": ["string", "null"], "enum": ["g", "z", "e", None]},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
-    "required": ["type", "confidence"],
+    "required": ["type", "odometer", "distance_km", "destination", "purpose", "business", "vehicle", "payee",
+                 "amount", "currency", "payment", "category_hint", "gst", "confidence"],
 }
 
 PROMPT_VERSION = "extract_v1"

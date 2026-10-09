@@ -101,9 +101,13 @@ def load_rules(path: str | Path | None) -> list[dict]:
         return tomllib.load(f).get("rule", [])
 
 
+def _key(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
 def match_rule(rules: list[dict], payee: str | None, hint: str | None) -> dict | None:
     for r in rules:
-        if "payee" in r and payee and r["payee"].lower() == payee.lower():
+        if "payee" in r and payee and _key(r["payee"]) == _key(payee):
             return r
         if "regex" in r and payee and re.search(r["regex"], payee, re.I):
             return r

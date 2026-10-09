@@ -54,7 +54,7 @@ def test_ollama_extract_sends_schema_and_probe_sees_audio(server):
     b = get_backend(cfg, "ollama")
     assert b.extract(build_prompt(cfg, "End trip, forty-eight two fifty-two.")) == REPLY
     path, req = seen[0]
-    assert path == "/api/chat" and req["format"] == SCHEMA and req["model"] == "gemma4:e4b"
+    assert path == "/api/chat" and req["format"] == SCHEMA and req["model"] == "gemma4:e4b" and req["think"] is False
     assert "forty-eight two fifty-two" in req["messages"][0]["content"] and "{transcript}" not in req["messages"][0]["content"]
     p = b.probe()
     assert p["reachable"] and p["extract_present"] and p["native_audio"]

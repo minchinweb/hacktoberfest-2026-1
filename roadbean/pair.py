@@ -57,6 +57,11 @@ class Builder:
     def warn(self, msg: str) -> None:
         self.warnings.append(msg)
 
+    @staticmethod
+    def _doubts(events: list[Event]) -> list[str]:
+        return [f"model confidence {e.x['confidence']} for {e.memo.name}; check the transcript"
+                for e in events if e.x["confidence"] != "high"]
+
     # ---- mileage ---------------------------------------------------------------------------------
     def vehicle(self, ev: Event):
         key, v, matched = resolve_vehicle(self.cfg, ev.x["vehicle"])
@@ -76,6 +81,7 @@ class Builder:
         """Emit opening / personal-gap / trip / allowance entries for one resolved trip."""
         cfg, m = self.cfg, self.cfg["mileage"]
         first = events[0]
+        reviews = reviews + self._doubts(events)
         dest = next((e.x["destination"] for e in events if e.x["destination"]), None)
         purpose = next((e.x["purpose"] for e in events if e.x["purpose"]), None)
         acct = v["odometer_account"]
@@ -208,7 +214,7 @@ class Builder:
 
     def receipt(self, ev: Event) -> None:
         x, r, g = ev.x, self.cfg["receipts"], self.cfg["gst"]
-        reviews: list[str] = []
+        reviews: list[str] = self._doubts([ev])
         photo = self._photo_for(ev)
         amount = parse_amount(x["amount"])
         payee = x["payee"]
@@ -237,6 +243,8 @@ class Builder:
             pay_acct = "Liabilities:Unknown-Payment"
         cur = x["currency"] or self.cur
         hint = (x["category_hint"] or "").title()
+        if rule and "payee" in rule and payee:
+            payee = rule["payee"]  # canonical spelling, whatever the speech engine produced
         title = payee or hint or "Receipt"
         narr = hint or "Receipt" if payee else (x["purpose"] or "Receipt")
         meta: list[tuple[str, object]] = [("memo-sha", ev.memo.sha), *extra]

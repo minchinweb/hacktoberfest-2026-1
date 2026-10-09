@@ -190,3 +190,16 @@ def test_logbook_totals(run, cfg, tmp_path):
     assert [r["destination"] for r in lb["rows"]] == ["Sherwood Park site", "Leduc office"]
     assert lb["business_use_pct"] == Decimal("14.3")
     assert logbook.to_csv(lb).splitlines()[0].startswith("date,vehicle")
+
+
+def test_low_model_confidence_is_flagged_and_not_asserted(run):
+    res = run([START("2026-10-09T080000", 1000, confidence="low"), END("2026-10-09T090000", 1040)])
+    assert "model confidence low for 2026-10-09T080000" in res.new_text
+    assert "; 2026-10-10 balance" in res.new_text
+    res = run([memo("2026-10-10T101530", "receipt", payee="Shell", amount="10.00", confidence="medium")])
+    assert "model confidence medium" in res.new_text
+
+
+def test_payee_rule_ignores_case_and_punctuation_and_uses_canonical_name(run):
+    res = run([memo("2026-10-09T101530", "receipt", payee="petro canada", amount="62.50", category_hint="fuel")])
+    assert '! "Petro-Canada" "Fuel"' in res.new_text and "GST-Receivable" in res.new_text

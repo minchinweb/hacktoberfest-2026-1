@@ -54,9 +54,9 @@ You need **ffmpeg** (phone audio is converted to 16 kHz mono) and one speech-to-
 
 | `[models].stt` | Install | Notes |
 |---|---|---|
+| `native` | An Ollama build whose model reports the `audio` capability (`doctor` checks); tested with `gemma4:e4b` | Best digits in testing; laptop-sized. Uses the OpenAI-compatible `input_audio` part. |
 | `whistle` | `pip install cactus-needle`, then `needle download whistle` and move `whistle.cact` to `~/.cache/whistle/` | [Cactus Whistle](https://cactuscompute.com/blog/whistle): 16.9 MB, CPU-only, prebuilt for Android. roadbean passes your vehicle names and payees as recognition keywords, and sets `NEEDLE_TELEMETRY=0`. |
 | `whisper.cpp:base.en` | whisper.cpp's `whisper-cli` plus `ggml-base.en.bin` in `[whisper].model_dir` | The established fallback. |
-| `native` | An Ollama build where `doctor` reports native audio on your Gemma model | Experimental; uses the OpenAI-compatible `input_audio` part. |
 
 And one extraction backend:
 
@@ -105,19 +105,24 @@ Add the `rb-memo` widget to your home screen. First tap starts recording (short 
 pytest
 ```
 
-24 tests, no model required: pairing, misheard odometer, missing ends, personal-km gaps, allowance tier crossing, GST split, photo linking, idempotency, incremental runs, snapshot against `samples/expected/`, `bean-check`-equivalent loading of the output (including balance assertions), the logbook totals, and the backends against a fake local server.
+26 tests, no model required: pairing, misheard odometer, missing ends, personal-km gaps, allowance tier crossing, GST split, photo linking, idempotency, incremental runs, snapshot against `samples/expected/`, `bean-check`-equivalent loading of the output (including balance assertions), the logbook totals, and the backends against a fake local server.
 
 ## Status and honest limitations
 
-Verified here: the whole deterministic core and its tests; Whistle transcribing synthetic memos on a laptop CPU (0.2–1.3 s each); the backends' request/response handling against a fake server.
+**Measured on the laptop** (Ollama, `gemma4:e4b` Q4_K_M, 7.5B reported size; five synthetic SAPI-voice memos from `samples/`):
 
-**Not yet verified**, because no Ollama, Gemma weights or Pixel were available when this was built:
-- Live Gemma extraction through Ollama (acceptance criterion 2) and the quality of `prompts/extract_v1.md` on real transcripts.
-- Whether any given Ollama or llama.cpp build accepts native audio (`doctor` probes the model's capabilities; the `native` path is best-effort).
-- The `llamacpp` backend in Termux on the Pixel 7, and per-memo timings there.
-- The Termux shortcuts on a real device, and a real drive with real memos. Accuracy on real memos is to be added here after that drive.
+| Speech engine | Digits right | Whole run (5 memos, incl. model load) | Result vs `samples/expected/staging.bean` |
+|---|---|---|---|
+| Gemma native audio (`stt = "native"`) | 3/3 odometer readings | ~26 s | identical except free text (`site` heard as `side`) |
+| Whistle (`stt = "whistle"`) | 0/3 (`4A210`, `48–52`, ...) | ~20 s | wrong 642 km trip, flagged only by a low-model-confidence note |
 
-Early observation: with a robotic Windows SAPI voice, Whistle misheard digits and words ("48210" became "4A210", "Leduc" became "Laduk"). That is what the odometer and pairing checks are for, and it argues for speaking odometer readings clearly. The synthetic samples in `samples/audio/` come from `samples/make_audio.py` (Piper or Windows SAPI); `samples/memos.json` holds what each one says.
+- Whistle transcribed each memo in 0.2–1.3 s on CPU, but mangled digits on the robotic test voice. Gemma's native audio did not. This is five memos in one synthetic voice, not a benchmark; real voices in a real car will differ.
+- Findings that shaped the code: Gemma 4 through Ollama must run with `think: false` (with thinking on, schema-constrained output came back empty or wrong, and was about 3x slower); and a garbled transcript can produce a *plausible* wrong trip that passes the range checks. So any entry built from a memo the model rated below `high` confidence gets a `; REVIEW:` comment and its balance assertion is commented out.
+- `doctor` correctly reports native audio support and the STT plan.
+
+**Still not verified:** the `llamacpp` backend with Gemma E2B on the Pixel 7 (and per-memo timings there), the Termux shortcuts on a real device, and a real drive with real memos. Accuracy on real memos is to be added here after that drive.
+
+The synthetic samples in `samples/audio/` come from `samples/make_audio.py` (Piper or Windows SAPI); `samples/memos.json` holds what each one says.
 
 ## Layout
 

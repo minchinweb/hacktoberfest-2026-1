@@ -29,6 +29,8 @@ class OllamaBackend:
             msg["images"] = images
         r = post_json(f"{self.url}/api/chat", {
             "model": model, "messages": [msg], "format": schema, "stream": False,
+            # Thinking models collapse under a JSON-schema constraint (empty/wrong objects, 3x slower).
+            "think": False,
             "options": {"temperature": 0},
         })
         return parse_model_json(r["message"]["content"])
