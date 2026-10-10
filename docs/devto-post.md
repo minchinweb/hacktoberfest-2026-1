@@ -6,13 +6,11 @@ tags: hf26challenge, gemma, python, opensource
 cover_image:
 ---
 
-<!-- Edit freely. TODO markers (search "TODO") are the bits only you can fill in. -->
-
-*This is my submission for the [Hacktoberfest 2026 Open-Source AI Challenge](https://dev.to/challenges), Week 1: Touch Grass. It is also entered for **Best Use of Gemma**.*
+*This is my submission for the [Hacktoberfest Open-Source AI Challenge: Week 1](https://dev.to/challenges/hacktoberfest-week1-2026-10-05) (Touch Grass). It is also entered for **Best Use of Gemma**.*
 
 ## What I built
 
-**roadbean** turns voice memos recorded on my phone, while I'm in the car, into entries in my [Beancount](https://beancount.github.io/) ledger. I say "trip start, odometer 1234, heading to the library", and later "trip end, 1254", and say "Safeway, 42 dollars 28, GST 7 cents" when I buy groceries. I get a mileage log I can hand to the CRA (i.e the tax man) and receipts waiting for review.
+**roadbean** turns voice memos recorded on my phone, while I'm in the car, into entries in my [Beancount](https://beancount.github.io/) ledger. I say "trip start, odometer 1234, heading to the library", and later "trip end, 1254", and say "Safeway, 42 dollars 28, GST 7 cents" when I buy groceries. I get a mileage log I can hand to the CRA (the Canada Revenue Agency, i.e. the "tax man") and receipts waiting for review.
 
 ```
 phone: voice memo / receipt photo
@@ -30,9 +28,7 @@ This is the laptop side. On the phone, three Termux:Widget buttons run a script 
 
 ![roadbean processing real phone memos](https://raw.githubusercontent.com/minchinweb/hacktoberfest-2026-1/main/docs/roadbean-demo.gif)
 
-<!-- TODO: the GIF is ~3.7 minutes and 2.5 MB. Consider trimming to the `roadbean process` run and the staging.bean result. It must be committed and pushed for the URL above to work. -->
-
-Look at what the demo does *not* do. My first real memo was transcribed as "uh memo". The model couldn't make a trip or receipt of it, so the entry says `not a trip or receipt; file by hand` instead of inventing something. The receipt memo came out as "purchase staple safeway for 42 28 and gst of 7 7", and the entry was written with the amounts it could trust, `no rule matched payee; left uncategorized`, and a review flag. The run also flagged a 305,023 km "trip" as exceeding `max_trip_km`, because a stale open trip from my earlier testing got paired with the new start. It was caught by a validation rule, not by me. Real input is messy; the point is that every miss lands as a visible review line rather than a wrong number in the books.
+Look at what the demo does *not* do. My first real memo was transcribed as "uh memo". The model couldn't make a trip or receipt of it, so the entry says `not a trip or receipt; file by hand` instead of inventing something. The receipt memo came out as "purchase staple safeway for 42 28 and gst of 7 7", and the entry was written with `no rule matched payee; left uncategorized` and a review flag. (It also got the GST wrong; more on that below.) The run also flagged a 305,023 km "trip" as exceeding `max_trip_km`, because a stale open trip from my earlier testing got paired with the new start. It was caught by a validation rule, not by me. Real input is messy; the point is that every miss lands as a visible review line rather than a wrong number in the books.
 
 ## How it works
 
@@ -55,12 +51,15 @@ Every entry carries `source: "roadbean 0.1.0"`, so I can tell later which versio
   source: "roadbean 0.1.0"
   memo-sha: "cc60a49a8f7b"
   receipt: "2026-10-10T121405.jpg"
+  gst: "g"
   transcript: "purchase staple safeway for 42 28 and gst of 7 7"
   ; REVIEW: no rule matched payee; left uncategorized
   Expenses:Uncategorized      40.27 CAD
   Assets:GST-Receivable        2.01 CAD
   Liabilities:Visa           -42.28 CAD
 ```
+
+Look closely at the GST line: **2.01 is wrong.** I said "7 cents". The extractor only records a GST *code* (`g` = taxable, `z` = zero-rated, `e` = exempt), not an amount, so it heard "GST applies" and the Python code split the total at a flat 5%. That is a bad assumption for groceries, where a basket usually mixes zero-rated items (milk, vegetables) with taxable ones (snacks, paper goods). It is exactly the kind of error the review step exists for, and it is still a limitation: roadbean can't yet take a spoken GST amount. I'm leaving the real output here instead of a tidy example. (The odd `"Null"` narration is also real output, and also still a bug.)
 
 ## Why Gemma
 
@@ -71,52 +70,99 @@ I wanted everything to run on hardware I own. The same family covers both ends:
 
 ### Native audio vs. a dedicated STT model
 
-I tried Whistle (Cactus's tiny STT model) against Gemma's native audio on five synthetic memos (Windows SAPI voices, so a best case for both):
+I tried Whistle (Cactus's tiny STT model) against Gemma's native audio on five synthetic memos (clean but robotic Windows SAPI voices, so an easy case for both):
 
 | STT | Odometer read correctly (3 trips) | Failure mode |
 |---|---|---|
-| Gemma native audio | 3 / 3 | none on this set |
+| Gemma native audio | 3 / 3 | none on odometer readings (one free-text word misheard) |
 | Whistle | 0 / 3 | produced a plausible but wrong 642 km trip |
 
-Whistle's wrong trip was only caught by the low-confidence flag. That result is why native audio is the default. Five synthetic recordings is a small, friendly sample, not a benchmark; real car noise is the next test. Real voice samples proved even harder to process (although I don't have a large enough body to provide useful confidence numbers like the above table).
+Whistle's wrong trip was only caught by the low-confidence flag. That result is why native audio is the default. Five synthetic recordings is a small, friendly sample, not a benchmark. Real voice samples proved harder to process, but I don't have enough of them to give meaningful numbers like the table above.
 
 I also considered EmbeddingGemma 2 for matching payees to rules. I decided against it: payees are a few dozen strings, normalized matching plus explicit rules is predictable, and an embedding match would add a non-deterministic step exactly where I want determinism.
 
 ## Taking it outside (Touch Grass)
 
-- load the phone side up at home. Add Termux shortcuts to the home screen.
-- step into the car ad the begining of the trip. Tap the "memo" shortcut and read off "trip start. Odometer xxx km"
-- drive around town. Errands need doing. Not a lot of grass as it's snowing, but we still get fresh air.
-- after completing the purchase, tap the "memo" shortcut again and record "Safeway purchase. 42.28 total, 7 cents GST".
-- tap on the "photo" shortcut to take a picture of the receipt. There is no photo preview, so we're going for best guess, but the idea was to keep phone time as low as possible.
-- get home, tap the "memo" shortcut and read off "trip end. Odometer xxx km".
-- tap the "sync" shortcut
-- the data is then processed on the laptop at home, at later time
+The idea is to keep phone time to a minimum while still keeping the records the CRA requires.
+
+- Set up the phone side at home: install the Termux shortcuts and add them to the home screen.
+- Get in the car at the start of the trip, tap the "memo" shortcut and say "Trip start. Odometer xxx km."
+- Drive around town and run errands. Not a lot of grass, as it's snowing, but we still get fresh air.
+- After the purchase, tap the "memo" shortcut again and say "Safeway purchase. 42.28 total, 7 cents GST."
+- Tap the "photo" shortcut to photograph the receipt. There is no photo preview, so it's a best guess, but the idea is to keep phone time as low as possible.
+- Back home, tap the "memo" shortcut and say "Trip end. Odometer xxx km."
+- Tap the "sync" shortcut.
+- The laptop processes the data later, at home.
+
+The voice memos landed in the inbox as they were supposed to, and git made sure they ended up on my laptop for review; so that part worked.
+
+Gemma's transcription of the car audio was a coin flip. It's hard to know whether the cause is the low-bandwidth recording from the phone, the phone's microphone placement, or the model itself. More investigation is needed. But in a pinch, the original recordings are available for human review.
+
+For changes, I would provide more feedback when using the shortcuts; it's hard to be confident that everything is working as expected. Also, installing a bunch of scripts in Termux is cool, but not really user friendly; a full Android app would be a (much more involved) option. Finally, I would love to figure out how to do the audio processing on my phone; the model seems small enough to support this, in theory.
 
 ## Honest limitations
 
-- Tested end to end on the laptop with synthetic and a few real memos. The Termux shortcuts are confirmed to work on-phone, but I didnt' get on-phone voice recognition working
+- Tested end to end on the laptop with synthetic and a few real memos. The Termux shortcuts work on the phone, but I didn't get on-phone voice recognition working.
 - Speech recognition errors become review lines, not wrong data, but they still need a human. Numbers read aloud ("1 2 3 4") are the weak spot.
+- GST is a flat 5% split when the receipt is marked taxable. Mixed baskets, such as groceries, come out wrong, and a spoken GST amount is ignored.
 - Single user, single currency (CAD default), personal vehicle with the CRA allowance enabled; the account names are the Beancount ones from my own setup.
-- almost no feedback on the phone. This was a "Feature" from the design breif, but it's hard as a user to feel confident that the process hasn't silently broken.
-- still requires a laptop to process
-- is set up to require syncing through git. Github allows private repos, but they still have access to your data (and trip and financial data are fairly dear), and self-hosting is an option, but involved to set up for only this project
+- There is almost no feedback on the phone. That was a feature of the design brief, but it makes it hard to feel confident the process hasn't silently broken.
+- It still requires a laptop to process.
+- It syncs through git. GitHub private repos are private to other users, but GitHub still holds the data, and trip and financial data are sensitive. Self-hosting is an option, but it's a lot of setup for one project.
+
+## Why open matters here
+
+Trip logs and receipts say where I go, when I'm away and what I spend. I didn't want a cloud API in the middle of that.
+
+- **Privacy.** Audio, photos and transcripts are processed on my laptop with Gemma through Ollama. Nothing is uploaded except to my own git remote, which I can control.
+- **Swappable models.** The speech engine and the extractor are config settings (`native`, Whistle, whisper.cpp; Ollama or llama.cpp). That is how I found that Gemma's native audio read odometers better than Whistle, with a one-line change. Hopefully better models keep coming out.
+- **No meter running.** A year of memos and receipts costs nothing per call. Re-runs are also "free".
+- **Where it was worse.** A closed cloud speech API would probably have handled my noisy car audio better. On the phone, the open pieces didn't get there in time.
 
 ## Try it
 
+On the laptop (needs Python 3.11+, [Ollama](https://ollama.com) with a Gemma model, and ffmpeg):
+
 ```bash
+git clone https://github.com/minchinweb/hacktoberfest-2026-1
+cd hacktoberfest-2026-1
 pip install -e .[ledger]
+ollama pull gemma4:e4b
 roadbean init ~/roadbean        # creates config, rules, inbox
 roadbean doctor ~/roadbean      # checks Ollama, ffmpeg, the model
 roadbean process ~/roadbean     # inbox -> staging.bean
 roadbean logbook ~/roadbean     # CRA-style CSV
 ```
 
-Code (MIT): https://github.com/minchinweb/hacktoberfest-2026-1
+You can try it without a phone: drop `.m4a` or `.wav` memos named by time (`2026-10-10T102541.m4a`) into `~/roadbean/inbox/`, or use the synthetic samples in `samples/`.
+
+### Setting up the phone (Android + Termux)
+
+The phone only records, photographs and syncs. Memos reach the laptop through a **private** git repo, because they contain your voice and optionally your location.
+
+1. **Make a private inbox repo**, e.g. `gh repo create roadbean-inbox --private`.
+2. **Install Termux, Termux:API and Termux:Widget from F-Droid** (all three from the same source), then in Termux:
+   ```bash
+   pkg install git termux-api ffmpeg openssh
+   git clone https://github.com/minchinweb/hacktoberfest-2026-1 ~/roadbean-src
+   cd ~/roadbean-src && bash termux/install.sh
+   ```
+   This puts `rb-memo`, `rb-sync` and `rb-photo` in `~/.shortcuts/tasks/`, so a widget tap runs in the background instead of opening a terminal. Run `termux-microphone-record -d` once by hand and allow the microphone prompt.
+3. **Let the phone push.** Make an SSH key (`ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519`), add the public key as a deploy key with write access on the inbox repo, then run `bash termux/init-repo.sh git@github.com:YOU/roadbean-inbox.git`.
+4. **Add the widgets.** Long-press the home screen, add a Termux:Widget, and pick `rb-memo`, `rb-photo` and `rb-sync`. Tap `rb-memo` to start recording and again to stop (60 second cap).
+5. **On the laptop,** clone the inbox repo as your roadbean folder: `git clone git@github.com:YOU/roadbean-inbox.git ~/roadbean`, then `roadbean init ~/roadbean`. After each trip, `git -C ~/roadbean pull && roadbean process ~/roadbean`.
+
+The full instructions, including removing everything with `termux/uninstall.sh`, are in the repo README.
+
+## Code
+
+{% embed https://github.com/minchinweb/hacktoberfest-2026-1 %}
+
+MIT licensed, and built this week for the challenge.
 
 ## How it was built
 
-The whole thing was built in a Claude Code session, with me steering from the phone and the terminal. The curated transcript:
+The whole thing was built in a Claude Code session, with me steering from the terminal. The curated transcript:
 
 {% agent_session building-roadbean-voice-memos-to-beancount-entries-9fp3fv %}
 
