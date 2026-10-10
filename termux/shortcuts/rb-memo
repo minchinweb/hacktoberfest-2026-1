@@ -1,24 +1,29 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # roadbean: one tap starts recording a memo, the next tap stops it. Vibration confirms; no need to look.
+# Installed under ~/.shortcuts/tasks/ so Termux:Widget runs it in the background (no terminal opens).
 RB_HOME="${RB_HOME:-$HOME/roadbean}"
 INBOX="$RB_HOME/inbox"
 STATE="$RB_HOME/.recording"
+MAX_SECONDS=60
 mkdir -p "$INBOX"
 
+# The recorder stops itself after MAX_SECONDS, so a toggle file older than that is stale.
 if [ -f "$STATE" ]; then
-  termux-microphone-record -q >/dev/null 2>&1
+  started="$(cut -d' ' -f1 "$STATE")"
+  if [ $(( $(date +%s) - started )) -lt $(( MAX_SECONDS + 3 )) ]; then
+    termux-microphone-record -q >/dev/null 2>&1
+    rm -f "$STATE"
+    termux-vibrate -d 300
+    exit 0
+  fi
   rm -f "$STATE"
-  termux-vibrate -d 300
-  exit 0
 fi
 
 NAME="$(date +%Y-%m-%dT%H%M%S)"
-echo "$NAME" > "$STATE"
-termux-microphone-record -f "$INBOX/$NAME.m4a" -l 60 >/dev/null 2>&1
+echo "$(date +%s) $NAME" > "$STATE"
+termux-microphone-record -f "$INBOX/$NAME.m4a" -l "$MAX_SECONDS" >/dev/null 2>&1
 termux-vibrate -d 100
-# Best-effort location, never blocks the recording. Set RB_LOCATION=0 to skip.
+# Best-effort location after recording has started; never blocks the memo. RB_LOCATION=0 skips it.
 if [ "${RB_LOCATION:-1}" = "1" ]; then
-  (timeout 8 termux-location -p network -r once > "$INBOX/$NAME.json" 2>/dev/null || rm -f "$INBOX/$NAME.json") &
+  timeout 8 termux-location -p network -r once > "$INBOX/$NAME.json" 2>/dev/null || rm -f "$INBOX/$NAME.json"
 fi
-# -l 60 stops the recorder after 60 s; clear the toggle state so the next tap starts a new memo.
-( sleep 61; rm -f "$STATE" ) >/dev/null 2>&1 &

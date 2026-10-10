@@ -8,10 +8,12 @@ RB_HOME="${RB_HOME:-$HOME/roadbean}"
 termux-microphone-record -q >/dev/null 2>&1 || true   # stop a recording left running
 
 for name in rb-memo rb-sync rb-photo; do
-  if [ -e "$HOME/.shortcuts/$name" ]; then
-    rm -f "$HOME/.shortcuts/$name"
-    echo "removed ~/.shortcuts/$name"
-  fi
+  for dir in "$HOME/.shortcuts/tasks" "$HOME/.shortcuts"; do   # tasks/ is current; the top level is from older installs
+    if [ -e "$dir/$name" ]; then
+      rm -f "$dir/$name"
+      echo "removed ${dir/#$HOME/\~}/$name"
+    fi
+  done
 done
 rm -f "$RB_HOME/.recording"
 

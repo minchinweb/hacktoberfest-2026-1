@@ -90,18 +90,51 @@ Add `include "staging.bean"` to your ledger. Each memo leaves `<name>.transcript
 - The first trip ever logged for a vehicle emits an `Odometer opening` entry against `Equity:Opening-Balances`; delete it if your ledger already has one.
 - The allowance (`[allowance]`, for a shareholder-employee using a personal vehicle) tracks cumulative business km per calendar year across runs and splits the rate at the threshold. Rates in the example config are the spec's 2026 values: verify them. roadbean records facts; it is not tax advice.
 
-## Phone capture (Termux)
+## Phone capture (Termux) and syncing to your laptop
+
+Memos travel phone -> laptop through a **private** git repo (the inbox). The memos hold your voice, client names and optionally your location, so keep that repo private.
+
+**1. Make the inbox repo (on the laptop or GitHub), private and empty.**
 
 ```
-pkg install termux-api git ffmpeg      # plus the Termux:API and Termux:Widget apps
-bash termux/install.sh                  # copies rb-memo, rb-sync, rb-photo to ~/.shortcuts
-pip install -e .                        # core only. Don't add [dev]/[ledger] here: beancount has no Android wheel and
-                                        # its source build fails without bison. Run `roadbean logbook` on the laptop.
+gh repo create roadbean-inbox --private          # or any private remote you can push to from the phone
 ```
 
-To remove everything: `bash termux/uninstall.sh` (keeps your memos; `--purge` deletes `~/roadbean` after a prompt).
+**2. Set up Termux (on the phone).** Install Termux, Termux:API and Termux:Widget from F-Droid (use the same source for all three).
 
-Add the `rb-memo` widget to your home screen. First tap starts recording (short buzz), second tap stops (longer buzz); memos are capped at 60 s. Location is best-effort (`RB_LOCATION=0` to disable). `rb-sync` commits and pushes `inbox/`; `rb-photo` snaps a receipt photo named by time so it links to the nearest memo (within `photo_link_window_min`). Record while parked or hands-free.
+```
+pkg install git termux-api ffmpeg openssh
+termux-setup-storage                             # optional
+git clone https://github.com/minchinweb/hacktoberfest-2026-1 ~/roadbean-src
+cd ~/roadbean-src
+bash termux/install.sh                           # puts rb-memo, rb-sync, rb-photo in ~/.shortcuts/tasks
+```
+
+The shortcuts go in `~/.shortcuts/tasks/` so a widget tap runs in the background. (Scripts directly in `~/.shortcuts/` open a Termux terminal that stays on screen.) Run `termux-microphone-record -d` once by hand and allow the microphone prompt; allow location too if you want it.
+
+**3. Let the phone push to the inbox repo.** Use an SSH key, so `rb-sync` never prompts:
+
+```
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub                        # GitHub: repo > Settings > Deploy keys > Add, tick "Allow write access"
+bash termux/init-repo.sh git@github.com:YOU/roadbean-inbox.git
+```
+
+`init-repo.sh` turns `~/roadbean` into a git repo with that remote and a `.gitignore` that keeps the generated `.transcript.txt` / `.extract.json` files out of sync (they're made on the laptop, so pulls never conflict).
+
+**4. Add the widgets.** Long-press the home screen, add a Termux:Widget, and pick `rb-memo` (and `rb-sync`, `rb-photo`). First tap starts recording (short buzz), second tap stops (longer buzz); memos are capped at 60 s. Location is best-effort (`RB_LOCATION=0` to disable). `rb-sync` commits and pushes `inbox/` and toasts the result; `rb-photo` snaps a receipt photo named by time so it links to the nearest memo (within `photo_link_window_min`). Record while parked or hands-free.
+
+**5. On the laptop**, clone the inbox once and then, per batch:
+
+```
+git clone git@github.com:YOU/roadbean-inbox.git ~/roadbean-inbox      # once
+git -C ~/roadbean-inbox pull
+roadbean process ~/roadbean-inbox/inbox --config roadbean.toml --rules rules.toml --out staging.bean
+```
+
+To remove everything from the phone: `bash termux/uninstall.sh` (keeps your memos; `--purge` deletes `~/roadbean` after a prompt).
+
+To run `roadbean` itself on the phone (the llama.cpp stretch goal), `pip install -e .` there installs the core only. Don't add `[dev]` or `[ledger]`: `beancount` has no Android wheel and its source build fails without bison. Run `roadbean logbook` on the laptop.
 
 ## Tests
 

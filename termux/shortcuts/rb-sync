@@ -1,9 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# roadbean: commit and push the inbox so the laptop can process it. Reuse your existing sync script if you prefer.
+# roadbean: commit and push the inbox so the laptop can pull and process it. Runs in the background.
+# Set up the repo first with termux/init-repo.sh.
 RB_HOME="${RB_HOME:-$HOME/roadbean}"
-cd "$RB_HOME" || exit 1
+cd "$RB_HOME" 2>/dev/null || { termux-toast "roadbean: $RB_HOME missing"; exit 1; }
+git rev-parse --git-dir >/dev/null 2>&1 || { termux-vibrate -d 600; termux-toast "roadbean: no git repo, run init-repo.sh"; exit 1; }
 git add inbox/
-git commit -qm "memos $(date +%F\ %H:%M)" || { termux-toast "roadbean: nothing new"; exit 0; }
+git commit -qm "memos $(date '+%F %H:%M')" || { termux-toast "roadbean: nothing new to sync"; exit 0; }
 if git pull -q --rebase && git push -q; then
   termux-vibrate -d 100; termux-toast "roadbean: synced"
 else
