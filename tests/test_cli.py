@@ -19,7 +19,7 @@ def test_init_creates_folder_and_never_overwrites(tmp_path, capsys):
     (home / "rules.toml").write_text("# mine\n", encoding="utf-8")
     assert main(["init", str(home)]) == 0
     assert (home / "rules.toml").read_text(encoding="utf-8") == "# mine\n"
-    assert "kept" in capsys.readouterr().out
+    assert "[INFO] Kept" in capsys.readouterr().out
 
 
 def test_process_uses_folder_config_rules_inbox_and_writes_staging_there(tmp_path):

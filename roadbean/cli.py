@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from . import log
 from .backends import BackendError, get_backend
 from .config import load_config, load_rules
 
@@ -23,10 +24,10 @@ def load_home(args, home: Path) -> tuple[dict, list]:
     cfg_path = Path(args.config) if getattr(args, "config", None) else home / "roadbean.toml"
     rules_path = Path(args.rules) if getattr(args, "rules", None) else home / "rules.toml"
     if not cfg_path.exists():
-        print(f"note: no {cfg_path}; using built-in defaults (run `roadbean init {home}` to create one)", file=sys.stderr)
+        log.warn(f"No {cfg_path}; using built-in defaults (run `roadbean init {home}` to create one).")
         cfg_path = None
     if not rules_path.exists():
-        print(f"note: no {rules_path}; every payee will be left uncategorized", file=sys.stderr)
+        log.warn(f"No {rules_path}; every payee will be left uncategorized.")
     return load_config(cfg_path), load_rules(rules_path)
 
 
@@ -37,56 +38,69 @@ def cmd_init(args) -> int:
     for name, example in (("roadbean.toml", "roadbean.example.toml"), ("rules.toml", "rules.example.toml")):
         dest = home / name
         if dest.exists():
-            print(f"kept   {dest}")
+            log.info(f"Kept {dest}", file=sys.stdout)
         elif (src / example).exists():
             shutil.copy(src / example, dest)
-            print(f"wrote  {dest}")
+            log.good(f"Wrote {dest}", file=sys.stdout)
         else:
-            print(f"cannot find {example}; reinstall roadbean from a source checkout", file=sys.stderr)
+            log.error(f"Cannot find {example}; reinstall roadbean from a source checkout.")
             return 1
-    print(f"ready: {home}")
-    print(f"  put memos in {home / 'inbox'}, edit the two .toml files, then `roadbean process {home}`")
+    log.good(f"Ready: {home}", file=sys.stdout)
+    log.info(f"Put memos in {home / 'inbox'}, edit the two .toml files, then `roadbean process {home}`.", file=sys.stdout)
     return 0
 
 
 def cmd_doctor(args) -> int:
+    out = sys.stdout
     cfg, _ = load_home(args, home_of(args))
     name = args.backend or cfg["models"]["backend"]
-    print(f"backend: {name}")
+    log.info(f"Backend: {name}", file=out)
     ok = True
     try:
         backend = get_backend(cfg, name)
         p = backend.probe()
     except BackendError as e:
-        print(f"  ✗ {e}")
+        log.error(str(e), file=out)
         return 1
     if not p.get("reachable"):
-        print(f"  ✗ not reachable: {p.get('error', '')}")
+        log.error(f"Not reachable: {p.get('error', '')}", file=out)
         ok = False
     else:
-        print("  ✓ reachable")
+        log.good("Reachable.", file=out)
         if "extract_present" in p:
-            mark = "✓" if p["extract_present"] else "✗ (try: ollama pull " + p["extract_model"] + ")"
-            print(f"  {mark} extract model {p['extract_model']}")
+            if p["extract_present"]:
+                log.good(f"Extract model {p['extract_model']} is installed.", file=out)
+            else:
+                log.error(f"Extract model {p['extract_model']} is missing (try: ollama pull {p['extract_model']}).", file=out)
             ok &= p["extract_present"]
     native = bool(p.get("native_audio"))
-    print(f"  {'✓' if native else '–'} native audio on {p['extract_model']}: {'yes' if native else 'no'}")
+    (log.good if native else log.info)(f"Native audio on {p['extract_model']}: {'yes' if native else 'no'}.", file=out)
 
     from . import stt
     spec = cfg["models"]["stt"]
     w = cfg["whisper"]
     whisper_ok = bool(shutil.which(w["binary"])) and any(Path(w["model_dir"]).expanduser().glob("ggml-*.bin"))
     whistle_ok = stt.whistle_available()
-    print(f"  {'✓' if whistle_ok else '–'} Whistle (pip install cactus-needle; needle download whistle)")
-    print(f"  {'✓' if whisper_ok else '–'} whisper.cpp ({w['binary']} + model in {w['model_dir']})")
-    print(f"  {'✓' if shutil.which('ffmpeg') else '✗'} ffmpeg (converts phone audio to 16 kHz WAV)")
+    (log.good if whistle_ok else log.info)(
+        "Whistle is " + ("available." if whistle_ok else "not installed (pip install cactus-needle; needle download whistle)."),
+        file=out)
+    (log.good if whisper_ok else log.info)(
+        "whisper.cpp is " + ("available." if whisper_ok else f"not installed ({w['binary']} + a model in {w['model_dir']})."),
+        file=out)
+    if shutil.which("ffmpeg"):
+        log.good("ffmpeg found (converts phone audio to 16 kHz WAV).", file=out)
+    else:
+        log.error("ffmpeg not found (needed to convert phone audio to 16 kHz WAV).", file=out)
+        ok = False
     plan = "native Gemma audio" if native and spec == "native" else spec
     usable = {"whistle": whistle_ok, "native": native}.get(spec, whisper_ok if spec.startswith("whisper.cpp") else False)
-    if not usable:
+    if usable:
+        log.good(f"Plan: transcribe with {plan}; extract with {p['extract_model']} via {name}.", file=out)
+    else:
         alt = "whistle" if whistle_ok else ("whisper.cpp" if whisper_ok else None)
-        plan = f"{spec} is unavailable; " + (f"switch [models].stt to {alt!r}" if alt else "install Whistle or whisper.cpp")
+        log.error(f"{spec} is unavailable; " + (f"switch [models].stt to {alt!r}." if alt else "install Whistle or whisper.cpp."),
+                  file=out)
         ok = False
-    print(f"plan: transcribe with {plan}; extract with {p['extract_model']} via {name}")
     return 0 if ok else 1
 
 
@@ -94,7 +108,7 @@ def cmd_process(args) -> int:
     from .pipeline import process
     home = home_of(args)
     if not home.is_dir():
-        print(f"{home} is not a folder", file=sys.stderr)
+        log.error(f"{home} is not a folder.")
         return 2
     cfg, rules = load_home(args, home)
     inbox = home / "inbox" if (home / "inbox").is_dir() else home  # a bare folder of memos still works
@@ -106,20 +120,20 @@ def cmd_process(args) -> int:
         try:
             backend = get_backend(cfg, args.backend)
         except BackendError as e:
-            print(e, file=sys.stderr)
+            log.error(str(e))
             return 2
     since = datetime.fromisoformat(args.since) if args.since else None
     res = process(inbox, cfg, rules, out, backend, from_json=args.from_json,
                   dry_run=args.dry_run, reextract=args.reextract, since=since)
     for w in res.warnings:
-        print(f"warning: {w}", file=sys.stderr)
+        log.warn(w)
     for t in res.open_trips:
-        print(f"OPEN TRIP: {t}", file=sys.stderr)
+        log.warn(f"Open trip: {t}")
     if args.dry_run:
         sys.stdout.write(res.new_text)
-    print(f"{res.entries} new entries, {res.skipped} memos already staged"
-          f"{f', {len(res.open_trips)} open trip(s)' if res.open_trips else ''}"
-          f"{' (dry run, nothing written)' if args.dry_run else f' -> {out}'}", file=sys.stderr)
+    log.good(f"{res.entries} new entries, {res.skipped} memos already staged"
+             f"{f', {len(res.open_trips)} open trip(s)' if res.open_trips else ''}"
+             f"{' (dry run, nothing written)' if args.dry_run else f' -> {out}'}.")
     return 0
 
 
@@ -127,22 +141,21 @@ def cmd_logbook(args) -> int:
     try:
         from . import logbook
     except ImportError:
-        print("`roadbean logbook` needs beancount: pip install 'roadbean[ledger]' (run it on the laptop, not Termux)",
-              file=sys.stderr)
+        log.error("`roadbean logbook` needs beancount: pip install 'roadbean[ledger]' (run it on the laptop, not Termux).")
         return 2
     home = home_of(args)
     cfg, _ = load_home(args, home)
     ledger = Path(args.ledger) if args.ledger else home / "main.bean"
     if not ledger.exists():
-        print(f"ledger not found: {ledger} (pass --ledger, or put your ledger at {home / 'main.bean'})", file=sys.stderr)
+        log.error(f"Ledger not found: {ledger} (pass --ledger, or put your ledger at {home / 'main.bean'}).")
         return 2
     lb = logbook.build(ledger, cfg, args.year)
     csv_path = Path(args.csv) if args.csv else home / f"logbook-{args.year}.csv"
     csv_path.write_text(logbook.to_csv(lb), encoding="utf-8")
-    print(f"wrote {len(lb['rows'])} trips to {csv_path}", file=sys.stderr)
-    print(logbook.summary(lb), file=sys.stderr)
     for e in lb["ledger_errors"]:
-        print(f"ledger error: {e}", file=sys.stderr)
+        log.error(f"Ledger: {e}")
+    log.good(f"Wrote {len(lb['rows'])} trips to {csv_path}.")
+    log.info(logbook.summary(lb))
     return 0
 
 
