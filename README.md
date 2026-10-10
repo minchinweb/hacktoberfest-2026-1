@@ -68,7 +68,7 @@ Model names are pinned in config, never hard-coded.
 ## Use
 
 ```
-roadbean process inbox/ --config roadbean.toml --rules rules.toml --out staging.bean
+roadbean process inbox/ --config roadbean.toml --rules rules.toml --out staging.bean   # always pass --config
 roadbean process inbox/ --dry-run                # print what would be added, write nothing
 roadbean process inbox/ --from-json              # no model: use existing .extract.json files
 roadbean process inbox/ --vision                 # also read receipt photos (laptop; ollama)

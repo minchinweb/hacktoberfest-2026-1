@@ -14,7 +14,7 @@ DEFAULTS: dict = {
         "backend": "ollama",
         "extract": "gemma4:e4b",
         "vision": "gemma4:e4b",
-        "stt": "whisper.cpp:base.en",
+        "stt": "native",
         "vision_enabled": False,
         "ollama_url": "http://localhost:11434",
         "llamacpp_url": "http://localhost:8080",

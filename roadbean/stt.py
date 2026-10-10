@@ -58,7 +58,7 @@ def _whisper_cpp(wav: Path, cfg: dict, model: str) -> str:
     w = cfg["whisper"]
     binary = shutil.which(w["binary"])
     if not binary:
-        raise SttError(f"{w['binary']} not found on PATH")
+        raise SttError(f"{w['binary']} not found on PATH. Set [models].stt = \"native\" (Gemma audio via Ollama) or \"whistle\" in roadbean.toml, and pass --config; `roadbean doctor` shows what is available")
     model_file = Path(w["model_dir"]).expanduser() / f"ggml-{model}.bin"
     if not model_file.exists():
         raise SttError(f"whisper model missing: {model_file}")
