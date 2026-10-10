@@ -16,6 +16,9 @@ def post_json(url: str, payload: dict, timeout: float = 300) -> dict:
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace").strip()[:500]
+        raise BackendError(f"{url}: HTTP {e.code}: {detail or e.reason}") from e
     except (urllib.error.URLError, TimeoutError, ValueError) as e:
         raise BackendError(f"{url}: {e}") from e
 

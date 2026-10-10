@@ -81,3 +81,17 @@ def test_parse_model_json_handles_fences_and_garbage():
     assert parse_model_json('```json\n{"a": 1}\n```') == {"a": 1}
     with pytest.raises(BackendError):
         parse_model_json("sorry, I can't")
+
+
+def test_native_stt_converts_phone_audio_to_wav_first(server, tmp_path, monkeypatch):
+    """Regression: a real phone .m4a was sent to Ollama as-is and rejected with HTTP 400."""
+    from roadbean import stt
+    cfg = load_config(ROOT / "roadbean.example.toml")
+    cfg["models"]["ollama_url"] = server
+    b = get_backend(cfg, "ollama")
+    sent = {}
+    monkeypatch.setattr(stt, "to_wav16k", lambda src, dst: (dst.write_bytes(b"RIFFfake"), dst)[1])
+    monkeypatch.setattr(b, "transcribe_native", lambda wav: sent.setdefault("suffix", wav.suffix) and "ok")
+    memo = tmp_path / "2026-10-10T102519.m4a"
+    memo.write_bytes(b"aac")
+    assert stt.transcribe(memo, cfg, [], b) == "ok" and sent["suffix"] == ".wav"

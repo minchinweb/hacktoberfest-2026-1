@@ -70,12 +70,12 @@ def _whisper_cpp(wav: Path, cfg: dict, model: str) -> str:
 
 def transcribe(audio: Path, cfg: dict, rules: list[dict] | None = None, backend=None) -> str:
     spec = cfg["models"]["stt"]
-    if spec == "native":
-        if backend is None or not hasattr(backend, "transcribe_native"):
-            raise SttError("stt = native requires a backend with native audio support")
-        return backend.transcribe_native(audio)
+    if spec == "native" and (backend is None or not hasattr(backend, "transcribe_native")):
+        raise SttError("stt = native requires a backend with native audio support")
     with tempfile.TemporaryDirectory() as td:
-        wav = to_wav16k(audio, Path(td) / "memo.wav")  # always: engines need 16 kHz mono
+        wav = to_wav16k(audio, Path(td) / "memo.wav")  # always: phone m4a/aac is not accepted by any engine as-is
+        if spec == "native":
+            return backend.transcribe_native(wav)
         if spec == "whistle":
             return _whistle(wav, keywords(cfg, rules or []), cfg["whistle"]["weights"])
         if spec.startswith("whisper.cpp:"):
