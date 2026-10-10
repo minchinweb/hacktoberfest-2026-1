@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from . import __version__
+
+SOURCE = f"roadbean {__version__}"  # stamped on every entry so you can tell what wrote it
+
 
 def fmt_num(d: Decimal | int) -> str:
     s = format(Decimal(d), "f")
@@ -36,7 +40,7 @@ class Entry:
 
     def render(self) -> str:
         head = f"{self.date.isoformat()} ! {quote(self.payee)} {quote(self.narration)}"
-        lines = [head]
+        lines = [head, f"  source: {quote(SOURCE)}"]
         for k, v in self.meta:
             lines.append(f"  {k}: {quote(v) if isinstance(v, str) else v}")
         lines += [f"  ; REVIEW: {r}" for r in self.reviews]

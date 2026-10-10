@@ -1,6 +1,7 @@
 ; roadbean staging file: pending (!) entries. Review, then move into your ledger.
 
 2026-10-09 ! "Odometer opening" "civic at first logged trip"
+  source: "roadbean 0.1.0"
   vehicle: "civic"
   odometer-end: 48210
   ; REVIEW: first logged trip for this vehicle; remove if your ledger already has an opening odometer
@@ -8,6 +9,7 @@
   Equity:Opening-Balances        -48210 KM
 
 2026-10-09 ! "Mileage" "Sherwood Park site — meter install"
+  source: "roadbean 0.1.0"
   memo-sha: "b09b661e3283"
   memo-sha-end: "a477d5249130"
   vehicle: "civic"
@@ -21,12 +23,14 @@
 2026-10-10 balance Assets:Vehicle:Civic:Odometer  48252 KM
 
 2026-10-09 ! "Mileage allowance" "42 km @ 0.73"
+  source: "roadbean 0.1.0"
   memo-sha: "b09b661e3283"
   vehicle: "civic"
   Expenses:Vehicle:Allowance      30.66 CAD
   Liabilities:Due-To-Shareholder  -30.66 CAD
 
 2026-10-09 ! "Petro-Canada" "Fuel"
+  source: "roadbean 0.1.0"
   memo-sha: "3f5e927bbbc7"
   gst: "g"
   transcript: "Receipt, Petro-Canada, sixty-two fifty, fuel, business."
@@ -36,6 +40,7 @@
   Liabilities:Visa       -62.50 CAD
 
 2026-10-09 ! "Parking" "client meeting downtown"
+  source: "roadbean 0.1.0"
   memo-sha: "442810e5ce4e"
   transcript: "Parking, eight dollars, cash, client meeting downtown."
   ; REVIEW: no receipt image
@@ -43,6 +48,7 @@
   Assets:Cash               -8.00 CAD
 
 2026-10-11 ! "Mileage" "Personal driving (763 km)"
+  source: "roadbean 0.1.0"
   memo-sha: "ffdaaefa2162"
   vehicle: "civic"
   odometer-start: 48252
@@ -51,6 +57,7 @@
   Income:Mileage:Personal        -763 KM
 
 2026-10-11 ! "Mileage" "Leduc office"
+  source: "roadbean 0.1.0"
   memo-sha: "ffdaaefa2162"
   vehicle: "civic"
   odometer-start: 49015
@@ -62,6 +69,7 @@
 2026-10-12 balance Assets:Vehicle:Civic:Odometer  49100 KM
 
 2026-10-11 ! "Mileage allowance" "85 km @ 0.73"
+  source: "roadbean 0.1.0"
   memo-sha: "ffdaaefa2162"
   vehicle: "civic"
   Expenses:Vehicle:Allowance      62.05 CAD

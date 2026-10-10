@@ -25,6 +25,7 @@ A paired business trip, with the odometer tracked as its own `KM` commodity so F
 
 ```beancount
 2026-10-09 ! "Mileage" "Sherwood Park site — meter install"
+  source: "roadbean 0.1.0"
   memo-sha: "3021b88daa2d"
   memo-sha-end: "0a5790c88d6c"
   vehicle: "civic"
@@ -85,6 +86,8 @@ Include the staging file from your ledger (`include "/path/to/roadbean/staging.b
 Status lines use the Battlestation style: `[GOOD]` (green), `[WARN]` (yellow), `[ERRO]` (red), `[INFO]` (cyan), with only the code coloured. They go to stderr, so the Beancount that `process --dry-run` prints on stdout stays clean. Colour turns off when output isn't a terminal or `NO_COLOR` is set; `FORCE_COLOR=1` forces it.
 
 ### Behaviour worth knowing
+
+- Every entry carries `source: "roadbean <version>"` metadata, so you can tell what wrote it (and which version) once entries are mixed with hand-written ones. Beancount has no standard key for this; `source` is the usual importer convention. Balance assertions are plain directives and carry no metadata.
 
 - The **filename timestamp is the event time**; the model never supplies a date.
 - A `trip_start` with no end is **held back** and reported on every `process` run as `[WARN] Open trip: started <time> (odometer, destination), no end memo yet; flagged as unmatched after <date>` (the summary line counts them too). While it is open, `staging.bean` holds it as a commented-out block (`; OPEN TRIP: ...`, ignored by Beancount). When the end memo arrives, roadbean replaces that block in place with the real entries; if no end ever comes, after `stale_after_days` the block becomes a flagged entry. You can also close an open trip by hand: uncomment the block and add `odometer-end` and the postings, or delete it and write your own entry (with `vehicle`, `odometer-start` and `odometer-end`). Either way roadbean won't recreate the open trip, and an end memo that later arrives for it isn't booked twice (`[INFO] ... already closed by hand`). An end with no start is flagged.

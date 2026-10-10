@@ -14,7 +14,7 @@ END = lambda ts, odo, **kw: memo(ts, "trip_end", odometer=odo, **kw)
 
 def norm(text: str) -> str:
     """Drop fields that legitimately differ between runs (hashes of audio, transcripts)."""
-    return "\n".join(l for l in text.splitlines() if not re.match(r"\s+(transcript|memo-sha(-end)?|receipt-sha):", l))
+    return "\n".join(l for l in text.splitlines() if not re.match(r"\s+(transcript|source|memo-sha(-end)?|receipt-sha):", l))
 
 
 def sample_memos():
@@ -304,3 +304,13 @@ def test_end_memo_for_a_trip_closed_by_hand_is_not_an_orphan(run):
     run.staging.write_text(text[: text.index("; OPEN TRIP")] + HAND_ENTRY, encoding="utf-8")
     res = run([END("2026-10-10T090000", 2030)], now=NOW.replace(day=11))
     assert res.entries == 0 and "without start" not in staged(run) and "Trip end" not in res.new_text
+
+
+def test_every_entry_carries_a_source_with_script_name_and_version(run):
+    from roadbean import __version__
+    run(sample_memos() + [START("2026-10-20T080000", 49100), memo("2026-10-21T080000", "note", "hello")],
+        now=NOW.replace(day=21))
+    text = staged(run)
+    live = [b for b in re.split(r"\n\n", text) if re.match(r"\d{4}-\d\d-\d\d ! ", b)]
+    assert len(live) >= 8 and all(f'  source: "roadbean {__version__}"' in b for b in live)
+    assert f';   source: "roadbean {__version__}"' in text  # the open-trip block too
