@@ -131,6 +131,7 @@ def test_gst_split_and_no_split(run, cfg):
     rec = memo("2026-10-09T101530", "receipt", payee="Petro-Canada", amount="62.50", category_hint="fuel", gst="g")
     res = run([rec])
     assert "59.52 CAD" in res.new_text and "Assets:GST-Receivable  2.98 CAD" in res.new_text
+    assert "GST assumed as 5% of the total" in res.new_text  # spoken "taxable": the 5% split is an assumption
     cfg["gst"]["split"] = False
     res = run([memo("2026-10-10T101530", "receipt", payee="Petro-Canada", amount="62.50", gst="g")], cfg_=cfg)
     assert "GST-Receivable" not in res.new_text and 'gst: "g"' in res.new_text and "62.50 CAD" in res.new_text
@@ -176,6 +177,8 @@ def test_incremental_run_supersedes_stale_assertion(run):
 def test_normalize_is_forgiving_but_never_guesses():
     x = normalize({"type": "trip_start", "odometer": "48,210", "amount": "$62.50", "payment": "Amex", "gst": "G"})
     assert x["odometer"] == 48210 and x["amount"] == "62.50" and x["payment"] is None and x["gst"] == "g"
+    y = normalize({"type": "receipt", "category_hint": "null", "payee": "None", "destination": " N/A "})
+    assert y["category_hint"] is None and y["payee"] is None and y["destination"] is None  # the word, not a JSON null
     assert normalize({"type": "bogus", "odometer": "lots"})["type"] == "note"
     assert normalize({"odometer": "lots"})["odometer"] is None
 

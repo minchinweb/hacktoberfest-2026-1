@@ -62,9 +62,13 @@ def _dec(v):
         return None
 
 
+_NULLISH = {"null", "none", "n/a", "na", "nil", "unknown", "undefined"}
+
+
 def _str(v):
+    """Trimmed string, or None. Small models sometimes write the word "null" instead of a JSON null."""
     v = None if v is None else str(v).strip()
-    return v or None
+    return None if not v or v.lower() in _NULLISH else v
 
 
 def normalize(raw: dict) -> dict:

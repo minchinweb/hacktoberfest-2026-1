@@ -165,7 +165,7 @@ pytest
 - Findings that shaped the code: Gemma 4 through Ollama must run with `think: false` (with thinking on, schema-constrained output came back empty or wrong, and was about 3x slower); and a garbled transcript can produce a *plausible* wrong trip that passes the range checks. So any entry built from a memo the model rated below `high` confidence gets a `; REVIEW:` comment and its balance assertion is commented out.
 - `doctor` correctly reports native audio support and the STT plan.
 
-**Still not verified:** the `llamacpp` backend with Gemma E2B on the Pixel 7 (and per-memo timings there), the Termux shortcuts on a real device, and a real drive with real memos. Accuracy on real memos is to be added here after that drive.
+**Verified on a phone:** the Termux shortcuts (record, photo, sync) and the git sync to the laptop. **Not working / not verified:** speech recognition on the phone itself (the `llamacpp` backend with Gemma E2B on the Pixel 7 never ran), and accuracy on real in-car audio, which was hit-and-miss and is unmeasured; the raw recordings can be reviewed by hand. **Known limits:** GST is a flat 5% split when a memo says the purchase was taxable (now flagged with a `; REVIEW:` line), so mixed baskets such as groceries come out wrong and a spoken GST amount is ignored.
 
 The synthetic samples in `samples/audio/` come from `samples/make_audio.py` (Piper or Windows SAPI); `samples/memos.json` holds what each one says.
 

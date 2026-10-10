@@ -287,6 +287,9 @@ class Builder:
         postings = []
         if gst == "g" and g["split"] and cur == self.cur:
             net, tax = gst_split(amount, dec(g["rate"]))
+            if x["gst"]:  # a taxable code heard in the memo, not a rule: the split is an assumption
+                reviews.append(f"GST assumed as {(dec(g['rate']) * 100).normalize():f}% of the total; check against the receipt "
+                               "(mixed baskets such as groceries include zero-rated items)")
             postings += [(account, money(net), cur), (g["account"], money(tax), cur)]
         else:
             postings.append((account, money(amount), cur))
