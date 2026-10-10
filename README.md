@@ -45,10 +45,11 @@ Driving between trips is derived automatically: when the next start reading is h
 ```
 python -m venv .venv && .venv/Scripts/activate      # or source .venv/bin/activate
 pip install -e ".[dev]"                             # laptop: also installs beancount (logbook) and pytest
-cp roadbean.example.toml roadbean.toml              # vehicles, accounts, models
-cp rules.example.toml rules.toml                    # payee/category -> account
-roadbean doctor --config roadbean.toml              # what works on this machine, and the plan
+roadbean init ~/roadbean                            # a folder holding roadbean.toml, rules.toml and inbox/
+roadbean doctor ~/roadbean                          # what works on this machine, and the plan
 ```
+
+Everything lives in one folder: `roadbean.toml` (vehicles, accounts, models), `rules.toml` (payee/category -> account), `inbox/` (memos and photos), and the generated `staging.bean`. Commands take that folder as their one argument. Leave it off and roadbean uses `$RB_HOME`, else the current directory. Individual `--config`, `--rules` and `--out` flags still override a path if you need to.
 
 You need **ffmpeg** (phone audio is converted to 16 kHz mono) and one speech-to-text engine:
 
@@ -68,16 +69,16 @@ Model names are pinned in config, never hard-coded.
 ## Use
 
 ```
-roadbean process inbox/ --config roadbean.toml --rules rules.toml --out staging.bean   # always pass --config
-roadbean process inbox/ --dry-run                # print what would be added, write nothing
-roadbean process inbox/ --from-json              # no model: use existing .extract.json files
-roadbean process inbox/ --vision                 # also read receipt photos (laptop; ollama)
-roadbean logbook --year 2026 --ledger main.bean --csv logbook.csv
+roadbean process ~/roadbean                      # inbox/ -> staging.bean, using the folder's config and rules
+roadbean process ~/roadbean --dry-run            # print what would be added, write nothing
+roadbean process ~/roadbean --from-json          # no model: use existing .extract.json files
+roadbean process ~/roadbean --vision             # also read receipt photos (laptop; ollama)
+roadbean logbook ~/roadbean --year 2026          # reads ~/roadbean/main.bean, writes logbook-2026.csv
 ```
 
-Add `include "staging.bean"` to your ledger. Each memo leaves `<name>.transcript.txt` and `<name>.extract.json` beside it as an audit trail; these are also the `--from-json` input, and an existing extract is reused rather than re-run (`--reextract` to redo).
+Include the staging file from your ledger (`include "/path/to/roadbean/staging.bean"`), or put your ledger at `<folder>/main.bean` so `logbook` finds it. Each memo leaves `<name>.transcript.txt` and `<name>.extract.json` beside it as an audit trail; these are also the `--from-json` input, and an existing extract is reused rather than re-run (`--reextract` to redo).
 
-`logbook` reads the ledger and prints a CRA-style log (date, odometer start/end, km, destination, purpose, status) plus business km, personal km, and business-use % for the year.
+`logbook` reads the ledger, writes a CRA-style log to `logbook-<year>.csv` (date, odometer start/end, km, destination, purpose, status), and prints business km, personal km, and business-use % for the year.
 
 ### Behaviour worth knowing
 
@@ -124,12 +125,12 @@ bash termux/init-repo.sh git@github.com:YOU/roadbean-inbox.git
 
 **4. Add the widgets.** Long-press the home screen, add a Termux:Widget, and pick `rb-memo` (and `rb-sync`, `rb-photo`). First tap starts recording (short buzz), second tap stops (longer buzz); memos are capped at 60 s. Location is best-effort (`RB_LOCATION=0` to disable). `rb-sync` commits and pushes `inbox/` and toasts the result; `rb-photo` snaps a receipt photo named by time so it links to the nearest memo (within `photo_link_window_min`). Record while parked or hands-free.
 
-**5. On the laptop**, clone the inbox once and then, per batch:
+**5. On the laptop**, clone the inbox repo: that clone *is* your roadbean folder.
 
 ```
-git clone git@github.com:YOU/roadbean-inbox.git ~/roadbean-inbox      # once
-git -C ~/roadbean-inbox pull
-roadbean process ~/roadbean-inbox/inbox --config roadbean.toml --rules rules.toml --out staging.bean
+git clone git@github.com:YOU/roadbean-inbox.git ~/roadbean     # once
+roadbean init ~/roadbean                                       # once: adds roadbean.toml and rules.toml beside inbox/
+git -C ~/roadbean pull && roadbean process ~/roadbean          # each batch
 ```
 
 To remove everything from the phone: `bash termux/uninstall.sh` (keeps your memos; `--purge` deletes `~/roadbean` after a prompt).
@@ -142,7 +143,7 @@ To run `roadbean` itself on the phone (the llama.cpp stretch goal), `pip install
 pytest
 ```
 
-26 tests, no model required: pairing, misheard odometer, missing ends, personal-km gaps, allowance tier crossing, GST split, photo linking, idempotency, incremental runs, snapshot against `samples/expected/`, `bean-check`-equivalent loading of the output (including balance assertions), the logbook totals, and the backends against a fake local server.
+32 tests, no model required: pairing, misheard odometer, missing ends, personal-km gaps, allowance tier crossing, GST split, photo linking, idempotency, incremental runs, snapshot against `samples/expected/`, `bean-check`-equivalent loading of the output (including balance assertions), the logbook totals, and the backends against a fake local server.
 
 ## Status and honest limitations
 

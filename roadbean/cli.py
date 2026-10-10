@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import sys
 from datetime import datetime
@@ -12,8 +13,44 @@ from .backends import BackendError, get_backend
 from .config import load_config, load_rules
 
 
+def home_of(args) -> Path:
+    """The roadbean folder: argument, else $RB_HOME, else the current directory."""
+    return Path(args.folder or os.environ.get("RB_HOME") or ".").expanduser()
+
+
+def load_home(args, home: Path) -> tuple[dict, list]:
+    """Config and rules from the folder (roadbean.toml, rules.toml), unless overridden by flags."""
+    cfg_path = Path(args.config) if getattr(args, "config", None) else home / "roadbean.toml"
+    rules_path = Path(args.rules) if getattr(args, "rules", None) else home / "rules.toml"
+    if not cfg_path.exists():
+        print(f"note: no {cfg_path}; using built-in defaults (run `roadbean init {home}` to create one)", file=sys.stderr)
+        cfg_path = None
+    if not rules_path.exists():
+        print(f"note: no {rules_path}; every payee will be left uncategorized", file=sys.stderr)
+    return load_config(cfg_path), load_rules(rules_path)
+
+
+def cmd_init(args) -> int:
+    home = home_of(args)
+    src = Path(__file__).resolve().parent.parent
+    (home / "inbox").mkdir(parents=True, exist_ok=True)
+    for name, example in (("roadbean.toml", "roadbean.example.toml"), ("rules.toml", "rules.example.toml")):
+        dest = home / name
+        if dest.exists():
+            print(f"kept   {dest}")
+        elif (src / example).exists():
+            shutil.copy(src / example, dest)
+            print(f"wrote  {dest}")
+        else:
+            print(f"cannot find {example}; reinstall roadbean from a source checkout", file=sys.stderr)
+            return 1
+    print(f"ready: {home}")
+    print(f"  put memos in {home / 'inbox'}, edit the two .toml files, then `roadbean process {home}`")
+    return 0
+
+
 def cmd_doctor(args) -> int:
-    cfg = load_config(args.config)
+    cfg, _ = load_home(args, home_of(args))
     name = args.backend or cfg["models"]["backend"]
     print(f"backend: {name}")
     ok = True
@@ -55,10 +92,15 @@ def cmd_doctor(args) -> int:
 
 def cmd_process(args) -> int:
     from .pipeline import process
-    cfg = load_config(args.config)
+    home = home_of(args)
+    if not home.is_dir():
+        print(f"{home} is not a folder", file=sys.stderr)
+        return 2
+    cfg, rules = load_home(args, home)
+    inbox = home / "inbox" if (home / "inbox").is_dir() else home  # a bare folder of memos still works
+    out = Path(args.out) if args.out else home / "staging.bean"
     if args.vision:
         cfg["models"]["vision_enabled"] = True
-    rules = load_rules(args.rules)
     backend = None
     if not args.from_json:
         try:
@@ -67,14 +109,14 @@ def cmd_process(args) -> int:
             print(e, file=sys.stderr)
             return 2
     since = datetime.fromisoformat(args.since) if args.since else None
-    res = process(Path(args.inbox), cfg, rules, Path(args.out), backend, from_json=args.from_json,
+    res = process(inbox, cfg, rules, out, backend, from_json=args.from_json,
                   dry_run=args.dry_run, reextract=args.reextract, since=since)
     for w in res.warnings:
         print(f"warning: {w}", file=sys.stderr)
     if args.dry_run:
         sys.stdout.write(res.new_text)
     print(f"{res.entries} new entries, {res.skipped} memos already staged"
-          f"{' (dry run, nothing written)' if args.dry_run else f' -> {args.out}'}", file=sys.stderr)
+          f"{' (dry run, nothing written)' if args.dry_run else f' -> {out}'}", file=sys.stderr)
     return 0
 
 
@@ -85,13 +127,16 @@ def cmd_logbook(args) -> int:
         print("`roadbean logbook` needs beancount: pip install 'roadbean[ledger]' (run it on the laptop, not Termux)",
               file=sys.stderr)
         return 2
-    cfg = load_config(args.config)
-    lb = logbook.build(Path(args.ledger), cfg, args.year)
-    if args.csv:
-        Path(args.csv).write_text(logbook.to_csv(lb), encoding="utf-8")
-        print(f"wrote {len(lb['rows'])} trips to {args.csv}", file=sys.stderr)
-    else:
-        sys.stdout.write(logbook.to_csv(lb))
+    home = home_of(args)
+    cfg, _ = load_home(args, home)
+    ledger = Path(args.ledger) if args.ledger else home / "main.bean"
+    if not ledger.exists():
+        print(f"ledger not found: {ledger} (pass --ledger, or put your ledger at {home / 'main.bean'})", file=sys.stderr)
+        return 2
+    lb = logbook.build(ledger, cfg, args.year)
+    csv_path = Path(args.csv) if args.csv else home / f"logbook-{args.year}.csv"
+    csv_path.write_text(logbook.to_csv(lb), encoding="utf-8")
+    print(f"wrote {len(lb['rows'])} trips to {csv_path}", file=sys.stderr)
     print(logbook.summary(lb), file=sys.stderr)
     for e in lb["ledger_errors"]:
         print(f"ledger error: {e}", file=sys.stderr)
@@ -101,17 +146,23 @@ def cmd_logbook(args) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="roadbean", description="Voice memos to Beancount mileage and receipts.")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    folder = dict(nargs="?", help="roadbean folder holding roadbean.toml, rules.toml, inbox/ (default: $RB_HOME, else .)")
+
+    i = sub.add_parser("init", help="create a roadbean folder with starter config, rules and an inbox")
+    i.add_argument("folder", **folder)
+    i.set_defaults(fn=cmd_init)
 
     d = sub.add_parser("doctor", help="check models, STT and audio support; print the backend plan")
-    d.add_argument("--config")
+    d.add_argument("folder", **folder)
+    d.add_argument("--config", help="override <folder>/roadbean.toml")
     d.add_argument("--backend", choices=["ollama", "llamacpp"])
     d.set_defaults(fn=cmd_doctor)
 
-    p = sub.add_parser("process", help="turn an inbox of memos into pending Beancount entries")
-    p.add_argument("inbox")
-    p.add_argument("--config")
-    p.add_argument("--rules")
-    p.add_argument("--out", default="staging.bean")
+    p = sub.add_parser("process", help="turn the folder's inbox of memos into pending Beancount entries")
+    p.add_argument("folder", **folder)
+    p.add_argument("--config", help="override <folder>/roadbean.toml")
+    p.add_argument("--rules", help="override <folder>/rules.toml")
+    p.add_argument("--out", help="override <folder>/staging.bean")
     p.add_argument("--backend", choices=["ollama", "llamacpp"])
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--from-json", action="store_true", help="use existing .extract.json files; no model")
@@ -121,10 +172,11 @@ def main(argv=None) -> int:
     p.set_defaults(fn=cmd_process)
 
     lg = sub.add_parser("logbook", help="CRA-style kilometre log and yearly totals")
+    lg.add_argument("folder", **folder)
     lg.add_argument("--year", type=int, default=datetime.now().year)
-    lg.add_argument("--ledger", required=True)
-    lg.add_argument("--csv")
-    lg.add_argument("--config")
+    lg.add_argument("--ledger", help="your ledger (default <folder>/main.bean; it should include staging.bean)")
+    lg.add_argument("--csv", help="default <folder>/logbook-<year>.csv")
+    lg.add_argument("--config", help="override <folder>/roadbean.toml")
     lg.set_defaults(fn=cmd_logbook)
 
     for stream in (sys.stdout, sys.stderr):
