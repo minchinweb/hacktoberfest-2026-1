@@ -12,7 +12,7 @@ cover_image:
 
 ## What I built
 
-**roadbean** turns voice memos recorded on my phone, while I'm in the car, into entries in my [Beancount](https://beancount.github.io/) ledger. I say "trip start, odometer 1234, heading to the library", and later "trip end, 1254", and say "Safeway, 42 dollars 28, GST 2.01" when I buy groceries. I get a mileage log I can hand to the CRA and receipts waiting for review.
+**roadbean** turns voice memos recorded on my phone, while I'm in the car, into entries in my [Beancount](https://beancount.github.io/) ledger. I say "trip start, odometer 1234, heading to the library", and later "trip end, 1254", and say "Safeway, 42 dollars 28, GST 7 cents" when I buy groceries. I get a mileage log I can hand to the CRA (i.e the tax man) and receipts waiting for review.
 
 ```
 phone: voice memo / receipt photo
@@ -62,8 +62,6 @@ Every entry carries `source: "roadbean 0.1.0"`, so I can tell later which versio
   Liabilities:Visa           -42.28 CAD
 ```
 
-<!-- TODO: swap in a cleaner example from a real drive if you get one. -->
-
 ## Why Gemma
 
 I wanted everything to run on hardware I own. The same family covers both ends:
@@ -80,23 +78,29 @@ I tried Whistle (Cactus's tiny STT model) against Gemma's native audio on five s
 | Gemma native audio | 3 / 3 | none on this set |
 | Whistle | 0 / 3 | produced a plausible but wrong 642 km trip |
 
-Whistle's wrong trip was only caught by the low-confidence flag. That result is why native audio is the default. Five synthetic recordings is a small, friendly sample, not a benchmark. On real phone recordings (low sample rate, car noise) the results were "so-so", and I didn't measure them. The raw recordings are in the inbox if anyone wants to review them by hand.
+Whistle's wrong trip was only caught by the low-confidence flag. That result is why native audio is the default. Five synthetic recordings is a small, friendly sample, not a benchmark; real car noise is the next test. Real voice samples proved even harder to process (although I don't have a large enough body to provide useful confidence numbers like the above table).
 
 I also considered EmbeddingGemma 2 for matching payees to rules. I decided against it: payees are a few dozen strings, normalized matching plus explicit rules is predictable, and an embedding match would add a non-deterministic step exactly where I want determinism.
 
 ## Taking it outside (Touch Grass)
 
-<!-- TODO: this is the section the challenge is about. Fill in after a real drive:
-- where you went, what you said, what the phone buttons were like to use one-handed
-- what Gemma got right and wrong on real car audio
-- anything you changed because of it -->
+- load the phone side up at home. Add Termux shortcuts to the home screen.
+- step into the car ad the begining of the trip. Tap the "memo" shortcut and read off "trip start. Odometer xxx km"
+- drive around town. Errands need doing. Not a lot of grass as it's snowing, but we still get fresh air.
+- after completing the purchase, tap the "memo" shortcut again and record "Safeway purchase. 42.28 total, 7 cents GST".
+- tap on the "photo" shortcut to take a picture of the receipt. There is no photo preview, so we're going for best guess, but the idea was to keep phone time as low as possible.
+- get home, tap the "memo" shortcut and read off "trip end. Odometer xxx km".
+- tap the "sync" shortcut
+- the data is then processed on the laptop at home, at later time
 
 ## Honest limitations
 
-- Tested end to end on the laptop with synthetic and a few real memos. On-phone transcription never worked for me, and I haven't verified the llama.cpp path on the Pixel. The Termux record/photo/sync shortcuts exist and were tested against stubs.
-- Accuracy on real in-car audio was "so-so" and is unmeasured.
+- Tested end to end on the laptop with synthetic and a few real memos. The Termux shortcuts are confirmed to work on-phone, but I didnt' get on-phone voice recognition working
 - Speech recognition errors become review lines, not wrong data, but they still need a human. Numbers read aloud ("1 2 3 4") are the weak spot.
 - Single user, single currency (CAD default), personal vehicle with the CRA allowance enabled; the account names are the Beancount ones from my own setup.
+- almost no feedback on the phone. This was a "Feature" from the design breif, but it's hard as a user to feel confident that the process hasn't silently broken.
+- still requires a laptop to process
+- is set up to require syncing through git. Github allows private repos, but they still have access to your data (and trip and financial data are fairly dear), and self-hosting is an option, but involved to set up for only this project
 
 ## Try it
 
@@ -115,3 +119,7 @@ Code (MIT): https://github.com/minchinweb/hacktoberfest-2026-1
 The whole thing was built in a Claude Code session, with me steering from the phone and the terminal. The curated transcript:
 
 {% agent_session building-roadbean-voice-memos-to-beancount-entries-9fp3fv %}
+
+## Author's Notes
+
+*N.B. Yes, this is very heavily written (code and documentation and the first draft of this post) using AI, and this required a fair bit of tinkering, so no "one shotting" here. As an experiment, I'm going to continue.*
