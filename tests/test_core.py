@@ -207,3 +207,52 @@ def test_low_model_confidence_is_flagged_and_not_asserted(run):
 def test_payee_rule_ignores_case_and_punctuation_and_uses_canonical_name(run):
     res = run([memo("2026-10-09T101530", "receipt", payee="petro canada", amount="62.50", category_hint="fuel")])
     assert '! "Petro-Canada" "Fuel"' in res.new_text and "GST-Receivable" in res.new_text
+
+
+def staged(run):
+    return run.staging.read_text(encoding="utf-8")
+
+
+def test_open_trip_is_written_as_a_commented_out_block(run):
+    res = run([START("2026-10-10T080000", 2000, dest="Lake")], now=NOW.replace(day=11))
+    text = staged(run)
+    assert res.entries == 0 and len(res.open_trips) == 1
+    assert "; OPEN TRIP: waiting for an end memo" in text
+    assert '; 2026-10-10 ! "Mileage" "Open trip — Lake"' in text and ";   odometer-start: 2000" in text
+    assert all(l.startswith(";") for l in text.split("\n\n")[-1].splitlines())  # nothing live in the ledger
+    assert bean_errors(text) == []
+
+
+def test_open_trip_block_is_not_duplicated_on_rerun(run):
+    run([START("2026-10-10T080000", 2000)], now=NOW.replace(day=11))
+    first = staged(run)
+    res = run([], now=NOW.replace(day=11))
+    assert staged(run) == first and staged(run).count("OPEN TRIP:") == 1 and len(res.open_trips) == 1
+
+
+def test_completed_trip_replaces_its_block_in_place(run):
+    run([START("2026-10-10T080000", 2000, dest="Lake")], now=NOW.replace(day=11))
+    run([memo("2026-10-10T120000", "receipt", payee="Shell", amount="10.00", category_hint="fuel")], now=NOW.replace(day=11))
+    before = staged(run)
+    assert before.index("OPEN TRIP") < before.index('"Shell"')
+    run([END("2026-10-10T090000", 2030)], now=NOW.replace(day=11))
+    text = staged(run)
+    assert "OPEN TRIP" not in text and "Open trip" not in text
+    assert text.index("odometer-end: 2030") < text.index('"Shell"')  # real entry sits where the block was
+    assert text.count("odometer-start: 2000") == 1
+    assert bean_errors(text) == []
+    assert run([], now=NOW.replace(day=11)).entries == 0  # and re-running adds nothing
+
+
+def test_stale_open_trip_block_becomes_the_flagged_entry(run):
+    run([START("2026-10-10T080000", 2000)], now=NOW.replace(day=11))
+    res = run([], now=NOW.replace(day=20))
+    text = staged(run)
+    assert "OPEN TRIP" not in text and "Trip start without end" in text and res.open_trips == []
+    assert text.count("Trip start without end") == 1
+
+
+def test_open_trip_block_does_not_hide_the_start_from_later_runs(run):
+    run([START("2026-10-10T080000", 2000)], now=NOW.replace(day=11))
+    res = run([END("2026-10-10T090000", 2030)], now=NOW.replace(day=11))  # the start must still be reprocessed
+    assert res.entries >= 1 and "Open trip" not in res.new_text

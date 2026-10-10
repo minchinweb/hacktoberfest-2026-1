@@ -87,7 +87,7 @@ Status lines use the Battlestation style: `[GOOD]` (green), `[WARN]` (yellow), `
 ### Behaviour worth knowing
 
 - The **filename timestamp is the event time**; the model never supplies a date.
-- A `trip_start` with no end is **held back** and reported on every `process` run as `[WARN] Open trip: started <time> (odometer, destination), no end memo yet; flagged as unmatched after <date>` (the summary line counts them too). After `stale_after_days` it is emitted as a flagged entry. An end with no start is flagged.
+- A `trip_start` with no end is **held back** and reported on every `process` run as `[WARN] Open trip: started <time> (odometer, destination), no end memo yet; flagged as unmatched after <date>` (the summary line counts them too). While it is open, `staging.bean` holds it as a commented-out block (`; OPEN TRIP: ...`, ignored by Beancount). When the end memo arrives, roadbean replaces that block in place with the real entries; if no end ever comes, after `stale_after_days` the block becomes a flagged entry. An end with no start is flagged.
 - Odometer checks: end > start, trip ≤ `max_trip_km`, start ≥ previous end (if lower, the reading is probably misheard: flagged, not "fixed", and its balance assertion is left commented out). Spoken vs odometer distance is compared within `distance_tolerance`.
 - Balance assertions are dated the day after a trip. If another trip lands the same day, the earlier assertion is dropped (or commented out in the staging file on a later run) so `bean-check` keeps passing.
 - Re-running adds nothing: each entry records the SHA of its audio (`memo-sha`) and photo (`receipt-sha`).
@@ -147,7 +147,7 @@ To run `roadbean` itself on the phone (the llama.cpp stretch goal), `pip install
 pytest
 ```
 
-32 tests, no model required: pairing, misheard odometer, missing ends, personal-km gaps, allowance tier crossing, GST split, photo linking, idempotency, incremental runs, snapshot against `samples/expected/`, `bean-check`-equivalent loading of the output (including balance assertions), the logbook totals, and the backends against a fake local server.
+42 tests, no model required: pairing, misheard odometer, missing ends, personal-km gaps, allowance tier crossing, GST split, photo linking, idempotency, incremental runs, snapshot against `samples/expected/`, `bean-check`-equivalent loading of the output (including balance assertions), the logbook totals, and the backends against a fake local server.
 
 ## Status and honest limitations
 

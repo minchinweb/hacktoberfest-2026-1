@@ -10,7 +10,8 @@ from pathlib import Path
 from . import stt
 from .backends import BackendError
 from .config import resolve_vehicle
-from .emit import HEADER, filter_assertions, parse_staging, render_all, staged_shas, supersede_staged
+from .emit import (HEADER, filter_assertions, find_open_blocks, parse_staging, render_all, render_open_trip,
+                   staged_shas, supersede_staged)
 from .extract import build_prompt, normalize
 from .memo import Memo, discover
 from .pair import Builder, Event, State
@@ -114,14 +115,31 @@ def process(inbox: Path, cfg: dict, rules: list[dict], staging: Path | None, bac
     entries = sorted(b.entries, key=lambda e: e.date)  # stable: opening, gap, trip, allowance keep order
     filter_assertions(entries)
     res.entries = len(entries)
-    res.new_text = render_all(entries)
     accounts = {k: v["odometer_account"] for k, v in cfg["vehicles"].items()}
-    base = supersede_staged(existing, entries, accounts) if entries else existing
-    if entries:
-        base = base if base.strip() else HEADER
-        res.staging_text = base.rstrip("\n") + "\n\n" + res.new_text
-    else:
-        res.staging_text = existing
-    if staging and not dry_run and entries:
-        staging.write_text(res.staging_text, encoding="utf-8")
+
+    # Open trips live in the file as commented-out blocks; a completed (or flagged) trip replaces its block in place.
+    text = supersede_staged(existing, entries, accounts) if entries else existing
+    blocks = find_open_blocks(text)
+    open_shas = {ev.memo.sha for ev in b.open_trips}
+    in_place: dict[str, list] = {}
+    for e in entries:
+        if e.origin in blocks and e.origin not in open_shas:
+            in_place.setdefault(e.origin, []).append(e)
+    for sha, m in sorted(find_open_blocks(text).items(), key=lambda kv: -kv[1].start()):  # last first: offsets stay valid
+        if sha in in_place:
+            text = text[: m.start()] + render_all(in_place[sha]).rstrip("\n") + text[m.end():]
+
+    appended = [e for e in entries if not any(e is x for es in in_place.values() for x in es)]
+    new_blocks = [render_open_trip(b.open_trip_entry(ev)) for ev in b.open_trips if ev.memo.sha not in blocks]
+    def joined(parts: list[str]) -> str:
+        parts = [p for p in parts if p]
+        return ("\n\n".join(parts) + "\n") if parts else ""
+
+    res.new_text = joined(new_blocks + [render_all(entries).rstrip("\n")])  # everything new this run
+    to_append = joined(new_blocks + [render_all(appended).rstrip("\n")])    # what lands at the end of the file
+    if to_append:
+        text = (text if text.strip() else HEADER).rstrip("\n") + "\n\n" + to_append
+    res.staging_text = text
+    if staging and not dry_run and text != existing:
+        staging.write_text(text, encoding="utf-8")
     return res

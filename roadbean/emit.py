@@ -32,6 +32,7 @@ class Entry:
     vehicle: str | None = None
     assertion: tuple[date, str, int] | None = None  # date, account, reading
     assertion_ok: bool = True
+    origin: str | None = None  # sha of the memo that started this entry's trip (to replace its open-trip block)
 
     def render(self) -> str:
         head = f"{self.date.isoformat()} ! {quote(self.payee)} {quote(self.narration)}"
@@ -112,6 +113,27 @@ def supersede_staged(text: str, new_entries: list[Entry], accounts: dict[str, st
         return m.group(0)
 
     return ASSERT_RE.sub(repl, text)
+
+
+OPEN_MARK = "; OPEN TRIP:"
+OPEN_RE = re.compile(r"^; OPEN TRIP:[^\n]*(?:\n;[^\n]*)*", re.M)
+OPEN_SHA_RE = re.compile(r'^;\s+memo-sha: "([0-9a-f]+)"', re.M)
+
+
+def render_open_trip(entry: Entry) -> str:
+    """A trip with no end memo yet, as a commented-out block. Beancount ignores it; roadbean replaces it later."""
+    body = "\n".join(("; " + l).rstrip() for l in entry.render().splitlines())
+    return f"{OPEN_MARK} waiting for an end memo; not in the ledger yet, replaced when the trip is completed.\n{body}"
+
+
+def find_open_blocks(text: str) -> dict[str, re.Match]:
+    """Commented open-trip blocks in a staging file, by the sha of the memo that started the trip."""
+    out = {}
+    for m in OPEN_RE.finditer(text):
+        sha = OPEN_SHA_RE.search(m.group(0))
+        if sha:
+            out[sha.group(1)] = m
+    return out
 
 
 def render_all(entries: list[Entry]) -> str:

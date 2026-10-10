@@ -70,7 +70,8 @@ class Builder:
 
     def _flagged(self, ev: Event, title: str, reviews: list[str], extra_meta=()) -> None:
         self.entries.append(Entry(ev.ts.date(), "Mileage", title,
-                                  [("memo-sha", ev.memo.sha), *extra_meta, ("transcript", ev.memo.transcript)], reviews))
+                                  [("memo-sha", ev.memo.sha), *extra_meta, ("transcript", ev.memo.transcript)], reviews,
+                                  origin=ev.memo.sha))
         self.warn(f"{ev.memo.name}: {title}: {'; '.join(reviews)}")
 
     def _loc(self, ev: Event):
@@ -80,6 +81,12 @@ class Builder:
     def _book(self, key: str, v: dict, events: list[Event], start: int | None, end: int | None, km: Decimal,
               reviews: list[str], business: bool | None) -> None:
         """Emit opening / personal-gap / trip / allowance entries for one resolved trip."""
+        n_before = len(self.entries)
+        self._book_entries(key, v, events, start, end, km, reviews, business)
+        for e in self.entries[n_before:]:
+            e.origin = events[0].memo.sha
+
+    def _book_entries(self, key, v, events, start, end, km, reviews, business) -> None:
         cfg, m = self.cfg, self.cfg["mileage"]
         first = events[0]
         reviews = reviews + self._doubts(events)
@@ -195,6 +202,24 @@ class Builder:
         if km > self.cfg["mileage"]["max_trip_km"]:
             return self._flagged(ev, "Trip needs review", reviews + [f"{fmt_num(km)} km exceeds max_trip_km"])
         self._book(key, v, [ev], s, e, km, reviews, ev.x["business"])
+
+    def open_trip_entry(self, ev: Event) -> Entry:
+        """The (commented-out) placeholder for a trip start that has no end memo yet."""
+        x = ev.x
+        key = resolve_vehicle(self.cfg, x["vehicle"])[0]
+        title = " — ".join(p for p in ("Open trip", x["destination"], x["purpose"]) if p)
+        meta: list[tuple[str, object]] = [("memo-sha", ev.memo.sha), ("vehicle", key)]
+        if x["odometer"] is not None:
+            meta.append(("odometer-start", x["odometer"]))
+        for k in ("destination", "purpose"):
+            if x[k]:
+                meta.append((k, x[k]))
+        meta += self._loc(ev)
+        meta.append(("transcript", ev.memo.transcript))
+        days = self.cfg["mileage"]["stale_after_days"]
+        return Entry(ev.ts.date(), "Mileage", title, meta,
+                     [f"no end memo yet; flagged as unmatched after {ev.ts + timedelta(days=days):%Y-%m-%d %H:%M}"],
+                     origin=ev.memo.sha)
 
     def orphan_end(self, ev: Event) -> None:
         meta = [("odometer-end", ev.x["odometer"])] if ev.x["odometer"] is not None else []
