@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roadbean"
-version = "0.1.0"
+dynamic = ["version"]  # read from roadbean/__init__.py: the single source of truth
 description = "Say it in the car, get it in the ledger: voice memos to Beancount mileage and receipt entries, using local open-weight models."
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,6 +20,9 @@ roadbean = "roadbean.cli:main"
 
 [tool.setuptools]
 packages = ["roadbean", "roadbean.backends"]
+
+[tool.setuptools.dynamic]
+version = { attr = "roadbean.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
