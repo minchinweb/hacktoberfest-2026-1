@@ -83,7 +83,7 @@ Include the staging file from your ledger (`include "/path/to/roadbean/staging.b
 ### Behaviour worth knowing
 
 - The **filename timestamp is the event time**; the model never supplies a date.
-- A `trip_start` with no end is **held back** (warning) and flagged after `stale_after_days`. An end with no start is flagged.
+- A `trip_start` with no end is **held back** and reported on every `process` run as `OPEN TRIP: started <time> (odometer, destination), no end memo yet; flagged as unmatched after <date>` (the summary line counts them too). After `stale_after_days` it is emitted as a flagged entry. An end with no start is flagged.
 - Odometer checks: end > start, trip ≤ `max_trip_km`, start ≥ previous end (if lower, the reading is probably misheard: flagged, not "fixed", and its balance assertion is left commented out). Spoken vs odometer distance is compared within `distance_tolerance`.
 - Balance assertions are dated the day after a trip. If another trip lands the same day, the earlier assertion is dropped (or commented out in the staging file on a later run) so `bean-check` keeps passing.
 - Re-running adds nothing: each entry records the SHA of its audio (`memo-sha`) and photo (`receipt-sha`).

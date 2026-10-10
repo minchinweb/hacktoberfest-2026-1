@@ -113,9 +113,12 @@ def cmd_process(args) -> int:
                   dry_run=args.dry_run, reextract=args.reextract, since=since)
     for w in res.warnings:
         print(f"warning: {w}", file=sys.stderr)
+    for t in res.open_trips:
+        print(f"OPEN TRIP: {t}", file=sys.stderr)
     if args.dry_run:
         sys.stdout.write(res.new_text)
     print(f"{res.entries} new entries, {res.skipped} memos already staged"
+          f"{f', {len(res.open_trips)} open trip(s)' if res.open_trips else ''}"
           f"{' (dry run, nothing written)' if args.dry_run else f' -> {out}'}", file=sys.stderr)
     return 0
 

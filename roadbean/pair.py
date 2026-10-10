@@ -50,6 +50,7 @@ class Builder:
         self.entries: list[Entry] = []
         self.warnings: list[str] = []
         self.pending: dict[str, Event] = {}
+        self.open_trips: list[Event] = []  # starts still waiting for an end memo after this run
         self.used_photos: set[Path] = set()
         self.receipt_images = receipt_images or {}  # photo path -> {"amount", "payee"}
         self.cur = cfg["currency"]
@@ -299,4 +300,4 @@ class Builder:
                               [f"no end memo after {self.cfg['mileage']['stale_after_days']} days"])
                 del self.pending[vkey]
             else:
-                self.warn(f"{st.memo.name}: trip start held back, waiting for an end memo")
+                self.open_trips.append(st)

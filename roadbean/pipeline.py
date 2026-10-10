@@ -23,6 +23,7 @@ class Result:
     entries: int = 0
     skipped: int = 0              # memos already in staging
     warnings: list[str] = field(default_factory=list)
+    open_trips: list[str] = field(default_factory=list)  # trip starts with no end memo yet
 
 
 def _load_cached(m: Memo) -> dict | None:
@@ -101,6 +102,14 @@ def process(inbox: Path, cfg: dict, rules: list[dict], staging: Path | None, bac
     b = Builder(cfg, rules, State.from_staging(existing, cfg), photos, now, images)
     b.run(events)
     res.warnings += b.warnings
+    stale_days = cfg["mileage"]["stale_after_days"]
+    for ev in b.open_trips:
+        x = ev.x
+        what = ", ".join(p for p in (f"odometer {x['odometer']}" if x["odometer"] is not None else "",
+                                     f"to {x['destination']}" if x["destination"] else "") if p)
+        res.open_trips.append(
+            f"started {ev.ts:%Y-%m-%d %H:%M}{' (' + what + ')' if what else ''}, no end memo yet; "
+            f"flagged as unmatched after {(ev.ts + timedelta(days=stale_days)):%Y-%m-%d %H:%M}")
 
     entries = sorted(b.entries, key=lambda e: e.date)  # stable: opening, gap, trip, allowance keep order
     filter_assertions(entries)

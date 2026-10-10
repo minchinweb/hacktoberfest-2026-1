@@ -65,7 +65,10 @@ def test_misheard_start_is_flagged_not_fixed(run):
 
 def test_start_without_end_is_held_back_then_flagged_when_stale(run):
     res = run([START("2026-10-10T080000", 2000)], now=NOW.replace(day=11))
-    assert res.entries == 0 and any("held back" in w for w in res.warnings)
+    assert res.entries == 0 and len(res.open_trips) == 1
+    assert "started 2026-10-10 08:00 (odometer 2000, to Site A)" in res.open_trips[0]
+    assert "flagged as unmatched after 2026-10-13 08:00" in res.open_trips[0]
+    assert len(run([], now=NOW.replace(day=11)).open_trips) == 1  # still reported on later runs
     res = run([], now=NOW.replace(day=20))
     assert res.entries == 1 and "Trip start without end" in res.new_text
     assert run([], now=NOW.replace(day=21)).entries == 0  # idempotent
@@ -75,6 +78,7 @@ def test_held_start_pairs_with_later_end(run):
     run([START("2026-10-10T080000", 2000)], now=NOW.replace(day=11))
     res = run([END("2026-10-10T090000", 2030)], now=NOW.replace(day=11))
     assert "odometer-end: 2030" in res.new_text and "Trip start without end" not in res.new_text
+    assert res.open_trips == []
 
 
 def test_end_without_start_and_bad_ends(run):
