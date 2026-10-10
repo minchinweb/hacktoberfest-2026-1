@@ -44,7 +44,7 @@ Driving between trips is derived automatically: when the next start reading is h
 
 ```
 python -m venv .venv && .venv/Scripts/activate      # or source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]"                             # laptop: also installs beancount (logbook) and pytest
 cp roadbean.example.toml roadbean.toml              # vehicles, accounts, models
 cp rules.example.toml rules.toml                    # payee/category -> account
 roadbean doctor --config roadbean.toml              # what works on this machine, and the plan
@@ -95,6 +95,8 @@ Add `include "staging.bean"` to your ledger. Each memo leaves `<name>.transcript
 ```
 pkg install termux-api git ffmpeg      # plus the Termux:API and Termux:Widget apps
 bash termux/install.sh                  # copies rb-memo, rb-sync, rb-photo to ~/.shortcuts
+pip install -e .                        # core only. Don't add [dev]/[ledger] here: beancount has no Android wheel and
+                                        # its source build fails without bison. Run `roadbean logbook` on the laptop.
 ```
 
 To remove everything: `bash termux/uninstall.sh` (keeps your memos; `--purge` deletes `~/roadbean` after a prompt).

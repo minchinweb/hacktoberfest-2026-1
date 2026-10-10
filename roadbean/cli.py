@@ -79,7 +79,12 @@ def cmd_process(args) -> int:
 
 
 def cmd_logbook(args) -> int:
-    from . import logbook
+    try:
+        from . import logbook
+    except ImportError:
+        print("`roadbean logbook` needs beancount: pip install 'roadbean[ledger]' (run it on the laptop, not Termux)",
+              file=sys.stderr)
+        return 2
     cfg = load_config(args.config)
     lb = logbook.build(Path(args.ledger), cfg, args.year)
     if args.csv:
