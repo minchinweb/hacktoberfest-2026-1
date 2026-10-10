@@ -97,6 +97,8 @@ pkg install termux-api git ffmpeg      # plus the Termux:API and Termux:Widget a
 bash termux/install.sh                  # copies rb-memo, rb-sync, rb-photo to ~/.shortcuts
 ```
 
+To remove everything: `bash termux/uninstall.sh` (keeps your memos; `--purge` deletes `~/roadbean` after a prompt).
+
 Add the `rb-memo` widget to your home screen. First tap starts recording (short buzz), second tap stops (longer buzz); memos are capped at 60 s. Location is best-effort (`RB_LOCATION=0` to disable). `rb-sync` commits and pushes `inbox/`; `rb-photo` snaps a receipt photo named by time so it links to the nearest memo (within `photo_link_window_min`). Record while parked or hands-free.
 
 ## Tests
