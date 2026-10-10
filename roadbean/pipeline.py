@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -25,6 +26,7 @@ class Result:
     skipped: int = 0              # memos already in staging
     warnings: list[str] = field(default_factory=list)
     open_trips: list[str] = field(default_factory=list)  # trip starts with no end memo yet
+    notes: list[str] = field(default_factory=list)       # neutral, e.g. a trip you closed by hand
 
 
 def _load_cached(m: Memo) -> dict | None:
@@ -48,6 +50,29 @@ def _extract_one(m: Memo, cfg, rules, backend, dry_run: bool) -> dict:
     if not dry_run:
         m.extract_path.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return normalize(raw)
+
+
+def _closed_by_hand(x: dict, ts: datetime, staged: list[dict], cfg: dict, stale_days: int) -> bool:
+    """Is this trip_start / trip_end already covered by a trip entry the user wrote or finished by hand?
+
+    A hand-made trip entry has odometer-start and odometer-end but no memo-sha-end (roadbean's own paired trips
+    record both memos). Match on vehicle and the odometer reading, close in time.
+    """
+    odo = x["odometer"]
+    if odo is None or x["type"] not in ("trip_start", "trip_end"):
+        return False
+    key = resolve_vehicle(cfg, x["vehicle"])[0]
+    start = x["type"] == "trip_start"
+    for e in staged:
+        m = e["meta"]
+        if m.get("vehicle") != key or "memo-sha-end" in m or "odometer-start" not in m or "odometer-end" not in m:
+            continue
+        if m["odometer-start" if start else "odometer-end"] != str(odo):
+            continue
+        days = (ts.date() - e["date"]).days
+        if abs(days) <= 1 if start else 0 <= days <= stale_days:
+            return True
+    return False
 
 
 def _receipt_images(photos, receipt_events, cfg, backend, from_json: bool, dry_run: bool) -> dict:
@@ -81,6 +106,7 @@ def process(inbox: Path, cfg: dict, rules: list[dict], staging: Path | None, bac
 
     memos, photos = discover(inbox, since)
     events: list[Event] = []
+    hand_closed: set[str] = set()  # starts whose commented-out open-trip block should now go
     for m in memos:
         if m.sha in seen:
             res.skipped += 1
@@ -95,6 +121,13 @@ def process(inbox: Path, cfg: dict, rules: list[dict], staging: Path | None, bac
             except (BackendError, stt.SttError) as e:
                 res.warnings.append(f"{m.name}: {e}; skipped (will retry next run)")
                 continue
+        if _closed_by_hand(x, m.ts, staged, cfg, cfg["mileage"]["stale_after_days"]):
+            res.notes.append(f"{m.name}: {x['type']} at odometer {x['odometer']} was already closed by hand in "
+                             f"{staging.name if staging else 'the staging file'}; skipped")
+            if x["type"] == "trip_start":
+                hand_closed.add(m.sha)
+            res.skipped += 1
+            continue
         events.append(Event(m, x))
 
     photos = [p for p in photos if p.sha not in seen]
@@ -119,6 +152,10 @@ def process(inbox: Path, cfg: dict, rules: list[dict], staging: Path | None, bac
 
     # Open trips live in the file as commented-out blocks; a completed (or flagged) trip replaces its block in place.
     text = supersede_staged(existing, entries, accounts) if entries else existing
+    for sha, m in sorted(find_open_blocks(text).items(), key=lambda kv: -kv[1].start()):
+        if sha in hand_closed:
+            text = text[: m.start()] + text[m.end():]
+    text = re.sub(r"\n{3,}", "\n\n", text)
     blocks = find_open_blocks(text)
     open_shas = {ev.memo.sha for ev in b.open_trips}
     in_place: dict[str, list] = {}

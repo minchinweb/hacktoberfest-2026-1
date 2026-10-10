@@ -129,6 +129,8 @@ def cmd_process(args) -> int:
         log.warn(w)
     for t in res.open_trips:
         log.warn(f"Open trip: {t}")
+    for n in res.notes:
+        log.info(n)
     if args.dry_run:
         sys.stdout.write(res.new_text)
     log.good(f"{res.entries} new entries, {res.skipped} memos already staged"

@@ -256,3 +256,51 @@ def test_open_trip_block_does_not_hide_the_start_from_later_runs(run):
     run([START("2026-10-10T080000", 2000)], now=NOW.replace(day=11))
     res = run([END("2026-10-10T090000", 2030)], now=NOW.replace(day=11))  # the start must still be reprocessed
     assert res.entries >= 1 and "Open trip" not in res.new_text
+
+
+# ---- closing an open trip by hand ----------------------------------------------------------------------------
+
+HAND_ENTRY = '''2026-10-10 ! "Mileage" "Lake"
+  vehicle: "civic"
+  odometer-start: 2000
+  odometer-end: 2030
+  Assets:Vehicle:Civic:Odometer  30 KM
+  Income:Mileage:Business        -30 KM
+'''
+
+
+def test_uncommenting_and_finishing_the_block_closes_the_trip(run):
+    run([START("2026-10-10T080000", 2000, dest="Lake")], now=NOW.replace(day=11))
+    text = staged(run)
+    sha = re.search(r'memo-sha: "(\w+)"', text).group(1)
+    block = text[text.index("; OPEN TRIP"):]
+    live = HAND_ENTRY.replace('  vehicle:', f'  memo-sha: "{sha}"\n  vehicle:')
+    run.staging.write_text(text.replace(block, live), encoding="utf-8")
+    res = run([], now=NOW.replace(day=11))
+    assert res.open_trips == [] and "OPEN TRIP" not in staged(run) and staged(run).count("odometer-start: 2000") == 1
+
+
+def test_deleting_the_block_and_writing_your_own_entry_is_not_undone(run):
+    run([START("2026-10-10T080000", 2000, dest="Lake")], now=NOW.replace(day=11))
+    text = staged(run)
+    run.staging.write_text(text[: text.index("; OPEN TRIP")] + HAND_ENTRY, encoding="utf-8")  # no memo-sha
+    res = run([], now=NOW.replace(day=11))
+    assert res.open_trips == [] and "OPEN TRIP" not in staged(run)
+    assert any("closed by hand" in n for n in res.notes)
+    assert staged(run).count("odometer-start: 2000") == 1
+
+
+def test_leftover_commented_block_is_removed_once_closed_by_hand(run):
+    run([START("2026-10-10T080000", 2000, dest="Lake")], now=NOW.replace(day=11))
+    run.staging.write_text(staged(run) + "\n" + HAND_ENTRY, encoding="utf-8")  # block kept, entry added by hand
+    res = run([], now=NOW.replace(day=11))
+    assert res.open_trips == [] and "OPEN TRIP" not in staged(run) and "Open trip" not in staged(run)
+    assert staged(run).count("odometer-start: 2000") == 1
+
+
+def test_end_memo_for_a_trip_closed_by_hand_is_not_an_orphan(run):
+    run([START("2026-10-10T080000", 2000, dest="Lake")], now=NOW.replace(day=11))
+    text = staged(run)
+    run.staging.write_text(text[: text.index("; OPEN TRIP")] + HAND_ENTRY, encoding="utf-8")
+    res = run([END("2026-10-10T090000", 2030)], now=NOW.replace(day=11))
+    assert res.entries == 0 and "without start" not in staged(run) and "Trip end" not in res.new_text
